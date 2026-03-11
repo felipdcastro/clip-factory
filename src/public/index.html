@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clip Factory</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>🎬 Clip Factory</h1>
+    <div class="user-info">
+      <form action="/auth/logout" method="POST" style="display:inline">
+        <button type="submit" class="logout-btn">Sair</button>
+      </form>
+    </div>
+  </header>
+
+  <main>
+    <!-- URL Form -->
+    <form id="url-form" class="url-form">
+      <input
+        type="url"
+        id="url-input"
+        placeholder="Cole a URL do YouTube aqui..."
+        required
+        autocomplete="off"
+      >
+      <button type="submit" class="btn btn-primary" id="submit-btn">Processar</button>
+    </form>
+
+    <!-- Status Bar -->
+    <div id="status-bar" class="status-bar">
+      <div id="status-text" style="font-size:0.9rem;color:#aaa;margin-bottom:6px"></div>
+      <div class="progress-steps">
+        <span class="step" id="step-downloading">Baixando</span>
+        <span class="step-arrow">›</span>
+        <span class="step" id="step-transcribing">Transcrevendo</span>
+        <span class="step-arrow">›</span>
+        <span class="step" id="step-analyzing">Analisando</span>
+        <span class="step-arrow">›</span>
+        <span class="step" id="step-analyzed">Pronto</span>
+      </div>
+    </div>
+
+    <!-- Suggestions Section -->
+    <div id="suggestions-section" style="display:none">
+      <div class="section-title" id="suggestions-title">Sugestões de corte</div>
+      <div id="suggestions-list" class="suggestions-list"></div>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

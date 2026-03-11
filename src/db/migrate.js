@@ -1,0 +1,87 @@
+const { pool } = require('./connection');
+
+const schema = `
+  CREATE TABLE IF NOT EXISTS jobs (
+    id          SERIAL PRIMARY KEY,
+    url         TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    title       TEXT,
+    duration_seconds INTEGER,
+    thumbnail_url TEXT,
+    channel_name  TEXT,
+    file_path   TEXT,
+    estimated_cost_usd DECIMAL(10,4),
+    error_message TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS transcriptions (
+    id          SERIAL PRIMARY KEY,
+    job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    text        TEXT,
+    words       JSONB,
+    duration_seconds INTEGER,
+    estimated_cost_usd DECIMAL(10,4),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS clip_suggestions (
+    id          SERIAL PRIMARY KEY,
+    job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    start_time  DECIMAL(10,3) NOT NULL,
+    end_time    DECIMAL(10,3) NOT NULL,
+    title       TEXT NOT NULL,
+    reason      TEXT,
+    type        TEXT NOT NULL CHECK (type IN ('video', 'reel')),
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS clips (
+    id          SERIAL PRIMARY KEY,
+    suggestion_id INTEGER REFERENCES clip_suggestions(id) ON DELETE SET NULL,
+    job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    file_path   TEXT,
+    type        TEXT NOT NULL CHECK (type IN ('video', 'reel')),
+    status      TEXT NOT NULL DEFAULT 'cutting' CHECK (status IN ('cutting', 'ready', 'failed')),
+    duration_ms INTEGER,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS uploads (
+    id              SERIAL PRIMARY KEY,
+    clip_id         INTEGER REFERENCES clips(id) ON DELETE SET NULL,
+    youtube_video_id TEXT,
+    youtube_url     TEXT,
+    title           TEXT NOT NULL,
+    description     TEXT,
+    status          TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'uploading', 'uploaded', 'scheduled', 'failed')),
+    scheduled_at    TIMESTAMPTZ,
+    uploaded_at     TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id           SERIAL PRIMARY KEY,
+    provider     TEXT NOT NULL UNIQUE,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT,
+    expires_at   TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
+async function migrate() {
+  const client = await pool.connect();
+  try {
+    console.log('🔄 Running migrations...');
+    await client.query(schema);
+    console.log('✅ Migrations complete');
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { migrate };
