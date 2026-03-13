@@ -46,7 +46,6 @@ async function getVideoMetadata(url) {
   const info = await ytDlpExec(url, {
     dumpSingleJson: true,
     noWarnings: true,
-    preferFreeFormats: true,
     skipDownload: true,
     ...getCookiesOptions(),
   });
@@ -69,7 +68,7 @@ async function downloadVideo(url, jobId) {
 
   await ytDlpExec(url, {
     output: outputTemplate,
-    format: 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]/best',
+    format: 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
     mergeOutputFormat: 'mp4',
     noWarnings: true,
     ...getCookiesOptions(),
