@@ -75,6 +75,7 @@ async function getVideoMetadata(url) {
     '--dump-single-json',
     '--no-warnings',
     '--skip-download',
+    '--extractor-args', 'youtube:player_client=android,web',
     ...getCookiesArgs(),
   ];
 
@@ -104,6 +105,7 @@ async function downloadVideo(url, jobId) {
     '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
     '--merge-output-format', 'mp4',
     '--no-warnings',
+    '--extractor-args', 'youtube:player_client=android,web',
     ...getCookiesArgs(),
   ];
 
