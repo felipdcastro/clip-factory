@@ -6,6 +6,27 @@ const TEMP_DIR = process.env.TEMP_DIR || './tmp';
 const MAX_DURATION_SECONDS = 3 * 60 * 60; // 3 horas
 
 /**
+ * Retorna opções extras com cookies se configurado
+ */
+function getCookiesOptions() {
+  const cookiesPath = process.env.YOUTUBE_COOKIES_PATH;
+  if (cookiesPath && fs.existsSync(cookiesPath)) {
+    return { cookies: cookiesPath };
+  }
+
+  // Se tiver cookies como string na env, salva em arquivo temporário
+  const cookiesContent = process.env.YOUTUBE_COOKIES;
+  if (cookiesContent) {
+    const tmpCookies = path.join(TEMP_DIR, 'yt-cookies.txt');
+    if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+    fs.writeFileSync(tmpCookies, cookiesContent);
+    return { cookies: tmpCookies };
+  }
+
+  return {};
+}
+
+/**
  * Valida se a URL é do YouTube
  */
 function isValidYouTubeUrl(url) {
@@ -25,9 +46,9 @@ async function getVideoMetadata(url) {
   const info = await ytDlpExec(url, {
     dumpSingleJson: true,
     noWarnings: true,
-    noCallHome: true,
     preferFreeFormats: true,
     skipDownload: true,
+    ...getCookiesOptions(),
   });
 
   return {
@@ -51,7 +72,7 @@ async function downloadVideo(url, jobId) {
     format: 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]/best',
     mergeOutputFormat: 'mp4',
     noWarnings: true,
-    noCallHome: true,
+    ...getCookiesOptions(),
   });
 
   // Encontrar o arquivo gerado

@@ -23,8 +23,7 @@ async function transcribeAudio(audioPath) {
   const transcript = await client.transcripts.transcribe({
     audio: audioPath,
     language_code: process.env.TRANSCRIPTION_LANGUAGE || 'pt',
-    word_boost: POLITICAL_WORD_BOOST,
-    boost_param: 'high',
+    speech_model: 'universal-2',
   });
 
   if (transcript.status === 'error') {
