@@ -17,6 +17,9 @@ COPY package*.json ./
 # Instala dependências Node.js (python já disponível)
 RUN npm ci --omit=dev
 
+# Substitui o binário do yt-dlp-exec pelo mais recente do pip3
+RUN cp $(which yt-dlp) /app/node_modules/yt-dlp-exec/bin/yt-dlp
+
 # Copia o resto do código
 COPY . .
 
