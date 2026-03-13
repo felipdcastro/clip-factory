@@ -1,7 +1,33 @@
 const router = require('express').Router();
-const { createJob, getJob, listJobs } = require('../modules/downloader/job.service');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { createJob, createJobFromFile, getJob, listJobs } = require('../modules/downloader/job.service');
 const { getTranscription } = require('../modules/transcriber/transcription.service');
 const { getSuggestions } = require('../modules/analyzer/analyzer.service');
+
+const TEMP_DIR = process.env.TEMP_DIR || './tmp';
+if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: TEMP_DIR,
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `upload_${Date.now()}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 4 * 1024 * 1024 * 1024 }, // 4GB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos de vídeo são permitidos (mp4, mkv, avi, mov, webm)'));
+    }
+  },
+});
 
 // POST /api/jobs — cria job e inicia download em background
 router.post('/', async (req, res, next) => {
@@ -15,6 +41,19 @@ router.post('/', async (req, res, next) => {
     res.status(201).json(job);
   } catch (err) {
     if (err.status === 400) return res.status(400).json({ error: err.message });
+    next(err);
+  }
+});
+
+// POST /api/jobs/upload — cria job a partir de arquivo de vídeo
+router.post('/upload', upload.single('video'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo de vídeo é obrigatório' });
+    }
+    const job = await createJobFromFile(req.file.path, req.file.originalname);
+    res.status(201).json(job);
+  } catch (err) {
     next(err);
   }
 });

@@ -23,11 +23,22 @@
         type="url"
         id="url-input"
         placeholder="Cole a URL do YouTube aqui..."
-        required
         autocomplete="off"
       >
-      <button type="submit" class="btn btn-primary" id="submit-btn">Processar</button>
+      <button type="submit" class="btn btn-primary" id="submit-btn">Processar URL</button>
     </form>
+
+    <!-- Upload Form -->
+    <form id="upload-form" class="url-form" style="margin-top:10px">
+      <input
+        type="file"
+        id="file-input"
+        accept=".mp4,.mkv,.avi,.mov,.webm"
+        style="flex:1;padding:10px;background:#1e1e1e;border:1px solid #333;border-radius:6px;color:#fff"
+      >
+      <button type="submit" class="btn btn-primary" id="upload-btn">Enviar Vídeo</button>
+    </form>
+    <div id="upload-progress" style="display:none;margin-top:8px;font-size:0.85rem;color:#aaa"></div>
 
     <!-- Status Bar -->
     <div id="status-bar" class="status-bar">

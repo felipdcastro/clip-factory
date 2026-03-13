@@ -320,6 +320,52 @@ async function scheduleUpload(clipId, suggestionId) {
   }
 }
 
+// ── Upload de arquivo ───────────────────────────────────────────────────────
+
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById('file-input');
+  const progressEl = document.getElementById('upload-progress');
+  const btn = document.getElementById('upload-btn');
+
+  if (!fileInput.files.length) return;
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('video', file);
+
+  btn.disabled = true;
+  progressEl.style.display = 'block';
+  progressEl.textContent = `Enviando ${file.name} (${(file.size / 1024 / 1024).toFixed(0)} MB)...`;
+
+  stopPolling();
+  transcriptionWords = [];
+  document.getElementById('suggestions-section').style.display = 'none';
+  document.getElementById('suggestions-list').innerHTML = '';
+
+  try {
+    const res = await fetch('/api/jobs/upload', { method: 'POST', body: formData });
+    if (res.status === 401) { location.href = '/login.html'; return; }
+    const job = await res.json();
+
+    if (!job || job.error) {
+      progressEl.textContent = job?.error || 'Erro ao enviar arquivo';
+      btn.disabled = false;
+      return;
+    }
+
+    progressEl.textContent = `✓ Arquivo recebido! Iniciando transcrição...`;
+    currentJobId = job.id;
+    updateProgress('downloaded');
+    startPolling(job.id);
+  } catch (err) {
+    progressEl.textContent = `Erro: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    fileInput.value = '';
+  }
+});
+
 // ── Form submit ────────────────────────────────────────────────────────────
 
 document.getElementById('url-form').addEventListener('submit', async (e) => {

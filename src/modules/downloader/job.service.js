@@ -90,4 +90,21 @@ async function listJobs() {
   return result.rows;
 }
 
-module.exports = { createJob, getJob, listJobs };
+/**
+ * Cria job a partir de arquivo enviado pelo usuário (sem download)
+ */
+async function createJobFromFile(filePath, originalName) {
+  const title = path.basename(originalName, path.extname(originalName));
+
+  const result = await query(
+    `INSERT INTO jobs (url, title, status, file_path, updated_at)
+     VALUES ($1, $2, 'downloaded', $3, NOW()) RETURNING *`,
+    [`file://${originalName}`, title, filePath]
+  );
+
+  const job = result.rows[0];
+  console.log(`✅ Job ${job.id} criado via upload: ${originalName}`);
+  return job;
+}
+
+module.exports = { createJob, createJobFromFile, getJob, listJobs };
