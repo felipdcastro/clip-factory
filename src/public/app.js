@@ -348,7 +348,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     if (res.status === 401) { location.href = '/login.html'; return; }
     const job = await res.json();
 
-    if (!job || job.error) {
+    if (!job || job.error || !job.id) {
       progressEl.textContent = job?.error || 'Erro ao enviar arquivo';
       btn.disabled = false;
       return;

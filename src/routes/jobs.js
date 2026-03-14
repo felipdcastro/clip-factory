@@ -71,7 +71,9 @@ router.get('/', async (req, res, next) => {
 // GET /api/jobs/:id — retorna status de um job
 router.get('/:id', async (req, res, next) => {
   try {
-    const job = await getJob(req.params.id);
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+    const job = await getJob(id);
     if (!job) return res.status(404).json({ error: 'Job não encontrado' });
     res.json(job);
   } catch (err) {
