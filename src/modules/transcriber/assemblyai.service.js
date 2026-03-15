@@ -1,6 +1,6 @@
 const { AssemblyAI } = require('assemblyai');
 
-const POLITICAL_WORD_BOOST = [
+const _POLITICAL_WORD_BOOST = [
   'MBL', 'Movimento Brasil Livre', 'Kim Kataguiri', 'Arthur do Val',
   'reforma tributária', 'impeachment', 'STF', 'Supremo Tribunal Federal',
   'congresso', 'senado', 'câmara', 'deputado', 'senador', 'presidente',

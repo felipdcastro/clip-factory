@@ -10,7 +10,7 @@ jest.mock('./openai.service', () => ({
 
 const { query } = require('../../db/connection');
 const { analyzeTranscription } = require('./openai.service');
-const { processAnalysis, getSuggestions, updateSuggestionStatus, validateSuggestion } = require('./analyzer.service');
+const { processAnalysis, updateSuggestionStatus, validateSuggestion } = require('./analyzer.service');
 
 describe('validateSuggestion', () => {
   const base = { start_time: 10, end_time: 130, title: 'Título teste', reason: 'Motivo', type: 'video' };

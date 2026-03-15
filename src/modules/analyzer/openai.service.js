@@ -44,7 +44,6 @@ function formatTranscriptionForPrompt(text, words, durationSeconds) {
     words.forEach(word => {
       const wordStart = word.start / 1000; // ms → s
       if (wordStart >= currentMarker) {
-        const markerIndex = text.indexOf(word.text, Math.max(0, text.length - 500));
         timeMarkers.push(`[${currentMarker}s] `);
         currentMarker += 30;
       }

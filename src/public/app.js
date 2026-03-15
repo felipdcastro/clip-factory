@@ -186,6 +186,7 @@ function renderDecidedActions(s) {
 
 // ── Aprovar / Rejeitar ─────────────────────────────────────────────────────
 
+// eslint-disable-next-line no-unused-vars
 async function decideSuggestion(id, status, btn) {
   btn.disabled = true;
   const other = btn.parentElement.querySelector(status === 'approved' ? '.btn-danger' : '.btn-success');
@@ -228,7 +229,7 @@ async function pollClipStatus(suggestionId, clipId) {
       // Tenta encontrar o clip pelo job (simplificado: usa o currentJobId)
       const data = await api('GET', `/api/jobs/${currentJobId}/suggestions`);
       if (data) {
-        const s = data.suggestions.find(x => x.id === suggestionId);
+        data.suggestions.find(x => x.id === suggestionId);
         // Clip ainda sendo criado pelo worker
       }
       if (attempts > 30) { clearInterval(poller); return; }
@@ -294,6 +295,7 @@ function buildUploadForm(clip, suggestionId) {
   return form;
 }
 
+// eslint-disable-next-line no-unused-vars
 async function scheduleUpload(clipId, suggestionId) {
   const title = document.getElementById(`upload-title-${suggestionId}`).value.trim();
   const desc  = document.getElementById(`upload-desc-${suggestionId}`).value.trim();

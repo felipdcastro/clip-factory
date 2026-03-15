@@ -33,6 +33,7 @@
     "yt-dlp-exec": "^1.0.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "eslint": "^10.0.3",
     "jest": "^30.3.0",
     "nodemon": "^3.1.14",
