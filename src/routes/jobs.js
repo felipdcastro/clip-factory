@@ -18,15 +18,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 4 * 1024 * 1024 * 1024 }, // 4GB
+  limits: { fileSize: 4 * 1024 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
     if (allowed.includes(path.extname(file.originalname).toLowerCase())) {
       cb(null, true);
     } else {
-      cb(new Error('Apenas arquivos de vídeo são permitidos (mp4, mkv, avi, mov, webm)'));
+      cb(new Error('Apenas arquivos de vídeo são permitidos'));
     }
   },
+});
+
+// Multer para chunks (aceita qualquer tipo — chunk é binário)
+const chunkUpload = multer({
+  dest: TEMP_DIR,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB por chunk
 });
 
 // POST /api/jobs — cria job e inicia download em background
@@ -45,7 +51,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// POST /api/jobs/upload — cria job a partir de arquivo de vídeo
+// POST /api/jobs/upload — cria job a partir de arquivo de vídeo (arquivo único)
 router.post('/upload', upload.single('video'), async (req, res, next) => {
   try {
     if (!req.file) {
@@ -53,6 +59,57 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
     }
     const job = await createJobFromFile(req.file.path, req.file.originalname);
     res.status(201).json(job);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/jobs/upload-chunk — recebe chunks e monta arquivo final
+router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next) => {
+  try {
+    const { uploadId, chunkIndex, totalChunks, fileName } = req.body;
+    if (!req.file || !uploadId || chunkIndex === undefined || !totalChunks || !fileName) {
+      return res.status(400).json({ error: 'Dados do chunk inválidos' });
+    }
+
+    const ext = path.extname(fileName).toLowerCase();
+    const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
+    if (!allowed.includes(ext)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Tipo de arquivo não permitido' });
+    }
+
+    // Move chunk para arquivo com nome previsível
+    const chunkPath = path.join(TEMP_DIR, `${uploadId}_chunk_${chunkIndex}`);
+    fs.renameSync(req.file.path, chunkPath);
+
+    const total = parseInt(totalChunks);
+    const index = parseInt(chunkIndex);
+
+    // Se não é o último chunk, apenas confirma recebimento
+    if (index < total - 1) {
+      return res.json({ received: index + 1, total });
+    }
+
+    // Último chunk — monta o arquivo final
+    const finalPath = path.join(TEMP_DIR, `${uploadId}${ext}`);
+    const writeStream = fs.createWriteStream(finalPath);
+
+    for (let i = 0; i < total; i++) {
+      const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
+      const data = fs.readFileSync(p);
+      writeStream.write(data);
+      fs.unlinkSync(p);
+    }
+
+    await new Promise((resolve, reject) => {
+      writeStream.end();
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    const job = await createJobFromFile(finalPath, fileName);
+    res.status(201).json({ job });
   } catch (err) {
     next(err);
   }

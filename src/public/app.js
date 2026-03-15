@@ -320,7 +320,40 @@ async function scheduleUpload(clipId, suggestionId) {
   }
 }
 
-// ── Upload de arquivo ───────────────────────────────────────────────────────
+// ── Upload de arquivo em chunks ─────────────────────────────────────────────
+
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB por chunk
+
+async function uploadFileInChunks(file, progressEl) {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const uploadId = `upload_${Date.now()}`;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const formData = new FormData();
+    formData.append('chunk', chunk);
+    formData.append('uploadId', uploadId);
+    formData.append('chunkIndex', i);
+    formData.append('totalChunks', totalChunks);
+    formData.append('fileName', file.name);
+
+    const pct = Math.round(((i + 1) / totalChunks) * 100);
+    progressEl.textContent = `Enviando... ${pct}% (parte ${i + 1}/${totalChunks})`;
+
+    const res = await fetch('/api/jobs/upload-chunk', { method: 'POST', body: formData });
+    if (res.status === 401) { location.href = '/login.html'; return null; }
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Último chunk — retorna o job criado
+    if (data.job) return data.job;
+  }
+  return null;
+}
 
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -331,12 +364,9 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   if (!fileInput.files.length) return;
 
   const file = fileInput.files[0];
-  const formData = new FormData();
-  formData.append('video', file);
-
   btn.disabled = true;
   progressEl.style.display = 'block';
-  progressEl.textContent = `Enviando ${file.name} (${(file.size / 1024 / 1024).toFixed(0)} MB)...`;
+  progressEl.textContent = `Iniciando envio de ${file.name} (${(file.size / 1024 / 1024).toFixed(0)} MB)...`;
 
   stopPolling();
   transcriptionWords = [];
@@ -344,9 +374,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   document.getElementById('suggestions-list').innerHTML = '';
 
   try {
-    const res = await fetch('/api/jobs/upload', { method: 'POST', body: formData });
-    if (res.status === 401) { location.href = '/login.html'; return; }
-    const job = await res.json();
+    const job = await uploadFileInChunks(file, progressEl);
 
     if (!job || job.error || !job.id) {
       progressEl.textContent = job?.error || 'Erro ao enviar arquivo';
