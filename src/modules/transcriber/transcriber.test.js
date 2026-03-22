@@ -20,6 +20,18 @@ jest.mock('./assemblyai.service', () => ({
   }),
 }));
 
+// Mock das filas BullMQ — evita necessidade de REDIS_URL em testes
+jest.mock('../../queues', () => ({
+  enqueueAnalysis: jest.fn().mockResolvedValue(undefined),
+  enqueueTranscription: jest.fn().mockResolvedValue(undefined),
+  enqueueClip: jest.fn().mockResolvedValue(undefined),
+  enqueueUpload: jest.fn().mockResolvedValue(undefined),
+  getQueuesStatus: jest.fn().mockResolvedValue({}),
+  closeQueues: jest.fn().mockResolvedValue(undefined),
+  QUEUE_NAMES: { TRANSCRIPTION: 'transcription', ANALYSIS: 'analysis', EDITOR: 'editor', UPLOAD: 'upload' },
+  connection: {},
+}));
+
 const { query } = require('../../db/connection');
 const { processTranscription, getTranscription } = require('./transcription.service');
 

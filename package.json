@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --testEnvironment node",
+    "test:coverage": "jest --testEnvironment node --coverage",
     "lint": "eslint src/**/*.js"
   },
   "engines": {

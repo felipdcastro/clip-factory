@@ -13,17 +13,18 @@ const { analyzeTranscription } = require('./openai.service');
 const { processAnalysis, updateSuggestionStatus, validateSuggestion } = require('./analyzer.service');
 
 describe('validateSuggestion', () => {
-  const base = { start_time: 10, end_time: 130, title: 'Título teste', reason: 'Motivo', type: 'video' };
+  // video requer duração entre 5-10 min (300-600s); reel entre 45-60s
+  const base = { start_time: 10, end_time: 370, title: 'Título teste', reason: 'Motivo', type: 'video' };
 
   it('aceita sugestão válida de vídeo', () => {
     expect(validateSuggestion(base, 3600)).toBe(true);
   });
 
-  it('aceita reel válido (30-90s)', () => {
-    expect(validateSuggestion({ ...base, end_time: 60, type: 'reel' }, 3600)).toBe(true);
+  it('aceita reel válido (45-60s)', () => {
+    expect(validateSuggestion({ ...base, start_time: 10, end_time: 65, type: 'reel' }, 3600)).toBe(true);
   });
 
-  it('rejeita clip muito curto (< 30s)', () => {
+  it('rejeita clip muito curto (< 300s para video)', () => {
     expect(validateSuggestion({ ...base, end_time: 25 }, 3600)).toBe(false);
   });
 
@@ -65,8 +66,8 @@ describe('processAnalysis', () => {
 
   it('salva sugestões válidas e atualiza status para analyzed', async () => {
     const mockSuggestions = [
-      { start_time: 10, end_time: 200, title: 'Vídeo teste', reason: 'Bom', type: 'video' },
-      { start_time: 50, end_time: 110, title: 'Reel teste', reason: 'Viral', type: 'reel' },
+      { start_time: 10, end_time: 370, title: 'Vídeo teste', reason: 'Bom', type: 'video' },  // 360s = 6 min ✓
+      { start_time: 50, end_time: 110, title: 'Reel teste', reason: 'Viral', type: 'reel' },   // 60s = max reel ✓
     ];
 
     query

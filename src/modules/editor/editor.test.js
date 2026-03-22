@@ -43,11 +43,12 @@ describe('processClip', () => {
           start_time: '10.0', end_time: '130.0', duration_seconds: 600,
         }],
       })
+      .mockResolvedValueOnce({ rows: [] }) // SELECT words from transcriptions
       .mockResolvedValueOnce({ rows: [{ id: 1, suggestion_id: 1, job_id: 1, type: 'video', status: 'cutting' }] }) // INSERT clip
       .mockResolvedValueOnce({ rows: [] }); // UPDATE ready
 
     const result = await processClip(1);
-    expect(cutClip).toHaveBeenCalledWith('/tmp/job_1.mp4', 1, 1, 10.0, 130.0, 'video');
+    expect(cutClip).toHaveBeenCalledWith('/tmp/job_1.mp4', 1, 1, 10.0, 130.0, 'video', null); // srtPath=null (sem words)
     expect(result.status).toBe('ready');
     expect(result.file_path).toBe('/tmp/1_1_video.mp4');
   });
@@ -61,6 +62,7 @@ describe('processClip', () => {
           start_time: '50.0', end_time: '80.0', duration_seconds: 600,
         }],
       })
+      .mockResolvedValueOnce({ rows: [] }) // SELECT words from transcriptions
       .mockResolvedValueOnce({ rows: [{ id: 2, suggestion_id: 2, job_id: 1, type: 'reel', status: 'cutting' }] })
       .mockResolvedValueOnce({ rows: [] }); // UPDATE failed
 
