@@ -99,6 +99,20 @@ function chunkTranscription(text, words, maxTokens = 80000) {
 }
 
 /**
+ * Valida que um item do GPT possui os campos obrigatórios com tipos corretos.
+ * Rejeita silenciosamente itens malformados em vez de deixar o pipeline quebrar.
+ */
+function validateSuggestionSchema(s) {
+  if (!s || typeof s !== 'object') return false;
+  if (typeof s.start_time !== 'number' || !Number.isFinite(s.start_time)) return false;
+  if (typeof s.end_time !== 'number' || !Number.isFinite(s.end_time)) return false;
+  if (typeof s.title !== 'string' || !s.title.trim()) return false;
+  if (typeof s.reason !== 'string') return false;
+  if (!['video', 'reel'].includes(s.type)) return false;
+  return true;
+}
+
+/**
  * Remove sugestões duplicadas (mesmo start_time ±5s)
  */
 function deduplicateSuggestions(suggestions) {
@@ -151,7 +165,13 @@ async function analyzeTranscription(transcriptionText, words, durationSeconds) {
       throw new Error('Resposta do GPT não contém array "suggestions"');
     }
 
-    allSuggestions.push(...parsed.suggestions);
+    const validItems = parsed.suggestions.filter(validateSuggestionSchema);
+    const dropped = parsed.suggestions.length - validItems.length;
+    if (dropped > 0) {
+      logger.warn({ dropped, chunk_index: chunks.indexOf(chunk) }, 'GPT retornou itens com schema inválido — descartados');
+    }
+
+    allSuggestions.push(...validItems);
   }
 
   return deduplicateSuggestions(allSuggestions);

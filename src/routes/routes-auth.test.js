@@ -324,27 +324,66 @@ describe('GET /auth/youtube (autenticado)', () => {
 });
 
 describe('GET /auth/youtube/callback (autenticado)', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.YOUTUBE_CLIENT_ID = 'test-client-id';
+    process.env.YOUTUBE_CLIENT_SECRET = 'test-client-secret';
+  });
 
-  it('redireciona para sucesso após trocar código', async () => {
+  afterEach(() => {
+    delete process.env.YOUTUBE_CLIENT_ID;
+    delete process.env.YOUTUBE_CLIENT_SECRET;
+  });
+
+  /**
+   * Helper: inicia o flow OAuth completo para obter o state gerado pela sessão.
+   * Visita /auth/youtube (que grava oauthState na sessão) e extrai o state
+   * inspecionando o argumento passado ao mock de getAuthUrl.
+   */
+  async function startOAuthFlow(agent) {
+    getAuthUrl.mockReturnValueOnce('https://accounts.google.com/mock-auth');
+    await agent.get('/auth/youtube');
+    // O state foi passado como primeiro argumento ao mock de getAuthUrl
+    return getAuthUrl.mock.calls[getAuthUrl.mock.calls.length - 1][0];
+  }
+
+  it('redireciona para sucesso após trocar código com state válido', async () => {
     const agent = await makeAuthAgent();
+    const state = await startOAuthFlow(agent);
     exchangeCodeForTokens.mockResolvedValueOnce({ access_token: 'ya29.token' });
-    const res = await agent.get('/auth/youtube/callback?code=mock-code');
+    const res = await agent.get(`/auth/youtube/callback?code=mock-code&state=${state}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain('youtube_auth=success');
   });
 
-  it('redireciona para erro se callback recebe error', async () => {
+  it('redireciona para erro se callback recebe error param (sem validar state)', async () => {
     const agent = await makeAuthAgent();
     const res = await agent.get('/auth/youtube/callback?error=access_denied');
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain('youtube_auth=error');
   });
 
+  it('redireciona para erro se state não coincide (CSRF)', async () => {
+    const agent = await makeAuthAgent();
+    await startOAuthFlow(agent); // define oauthState na sessão
+    const res = await agent.get('/auth/youtube/callback?code=mock-code&state=estado-errado');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('youtube_auth=error');
+  });
+
+  it('redireciona para erro se state ausente', async () => {
+    const agent = await makeAuthAgent();
+    await startOAuthFlow(agent);
+    const res = await agent.get('/auth/youtube/callback?code=mock-code');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain('youtube_auth=error');
+  });
+
   it('redireciona para erro se exchangeCodeForTokens lança', async () => {
     const agent = await makeAuthAgent();
+    const state = await startOAuthFlow(agent);
     exchangeCodeForTokens.mockRejectedValueOnce(new Error('OAuth falhou'));
-    const res = await agent.get('/auth/youtube/callback?code=bad-code');
+    const res = await agent.get(`/auth/youtube/callback?code=bad-code&state=${state}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain('youtube_auth=error');
   });

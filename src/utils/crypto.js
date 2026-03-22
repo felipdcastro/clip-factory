@@ -53,10 +53,12 @@ function encryptToken(plaintext) {
 function decryptToken(encryptedText) {
   if (!encryptedText) return null;
 
-  // Suporte a tokens legados (plain text sem ':') — retorna como está
   const parts = encryptedText.split(':');
   if (parts.length !== 3) {
-    return encryptedText;
+    throw new Error(
+      'Token OAuth com formato inválido. ' +
+      'Reautentique em /auth/youtube para gerar novo token encriptado.'
+    );
   }
 
   const key = getKey();

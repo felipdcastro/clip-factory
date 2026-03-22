@@ -19,6 +19,12 @@ const jobCreateLimiter = rateLimit({
 const TEMP_DIR = process.env.TEMP_DIR || './tmp';
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
+// Trava em memória para prevenir race condition na montagem do arquivo final
+const assemblingUploads = new Set();
+
+// Valida que uploadId não contém path traversal
+const SAFE_UPLOAD_ID = /^[a-zA-Z0-9_-]+$/;
+
 const storage = multer.diskStorage({
   destination: TEMP_DIR,
   filename: (req, file, cb) => {
@@ -76,16 +82,21 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
 
 // POST /api/jobs/upload-chunk — recebe chunks e monta arquivo final
 router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next) => {
+  const multerFilePath = req.file?.path;
   try {
     const { uploadId, chunkIndex, totalChunks, fileName } = req.body;
     if (!req.file || !uploadId || chunkIndex === undefined || !totalChunks || !fileName) {
       return res.status(400).json({ error: 'Dados do chunk inválidos' });
     }
 
+    // Sanitiza uploadId para prevenir path traversal
+    if (!SAFE_UPLOAD_ID.test(uploadId)) {
+      return res.status(400).json({ error: 'uploadId inválido' });
+    }
+
     const ext = path.extname(fileName).toLowerCase();
     const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
     if (!allowed.includes(ext)) {
-      fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: 'Tipo de arquivo não permitido' });
     }
 
@@ -101,26 +112,40 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
       return res.json({ received: index + 1, total });
     }
 
-    // Último chunk — monta o arquivo final
-    const finalPath = path.join(TEMP_DIR, `${uploadId}${ext}`);
-    const writeStream = fs.createWriteStream(finalPath);
-
-    for (let i = 0; i < total; i++) {
-      const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
-      const data = fs.readFileSync(p);
-      writeStream.write(data);
-      fs.unlinkSync(p);
+    // Último chunk — verifica se já está sendo montado (race condition)
+    if (assemblingUploads.has(uploadId)) {
+      return res.status(409).json({ error: 'Arquivo já está sendo montado. Aguarde.' });
     }
+    assemblingUploads.add(uploadId);
 
-    await new Promise((resolve, reject) => {
-      writeStream.end();
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-    });
+    let finalPath;
+    try {
+      finalPath = path.join(TEMP_DIR, `${uploadId}${ext}`);
+      const writeStream = fs.createWriteStream(finalPath);
 
-    const job = await createJobFromFile(finalPath, fileName);
-    res.status(201).json({ job });
+      for (let i = 0; i < total; i++) {
+        const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
+        const data = fs.readFileSync(p);
+        writeStream.write(data);
+        fs.unlinkSync(p);
+      }
+
+      await new Promise((resolve, reject) => {
+        writeStream.end();
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
+      });
+
+      const job = await createJobFromFile(finalPath, fileName);
+      res.status(201).json({ job });
+    } finally {
+      assemblingUploads.delete(uploadId);
+    }
   } catch (err) {
+    // Limpa arquivo temporário do multer se não foi movido
+    if (multerFilePath && fs.existsSync(multerFilePath)) {
+      try { fs.unlinkSync(multerFilePath); } catch { /* ignora erro de cleanup */ }
+    }
     next(err);
   }
 });

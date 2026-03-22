@@ -50,10 +50,9 @@ describe('crypto utils', () => {
       expect(decryptToken(null)).toBeNull();
     });
 
-    it('decryptToken retorna valor original para tokens legados (plain text sem ":")', () => {
+    it('lança erro para tokens com formato inválido (sem encriptação / plain text)', () => {
       const { decryptToken } = getCrypto();
-      const legacyToken = 'ya29.plain_text_legacy_token';
-      expect(decryptToken(legacyToken)).toBe(legacyToken);
+      expect(() => decryptToken('ya29.plain_text_legacy_token')).toThrow('formato inválido');
     });
 
     it('lança erro ao decriptar com chave diferente', () => {

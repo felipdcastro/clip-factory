@@ -13,14 +13,16 @@ function createOAuthClient() {
 }
 
 /**
- * Gera URL de autorização OAuth — redirecionar o usuário para esta URL
+ * Gera URL de autorização OAuth com state para proteção CSRF.
+ * @param {string} state - valor aleatório gerado pelo caller e armazenado na sessão
  */
-function getAuthUrl() {
+function getAuthUrl(state) {
   const client = createOAuthClient();
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/youtube.upload'],
     prompt: 'consent', // força retorno do refresh_token
+    state,
   });
 }
 
