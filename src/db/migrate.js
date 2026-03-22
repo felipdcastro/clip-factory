@@ -82,6 +82,19 @@ const migrations = [
   // Story 5.2: retry_count e failure_reason na tabela uploads
   `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS failure_reason TEXT`,
+
+  // Story 5.6: indexes de performance
+  // PostgreSQL não cria indexes automaticamente para FKs
+  `CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_transcriptions_job_id ON transcriptions(job_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_clip_suggestions_job_id ON clip_suggestions(job_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_clip_suggestions_status ON clip_suggestions(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_clips_job_id ON clips(job_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_clips_suggestion_id ON clips(suggestion_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_clips_status ON clips(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_uploads_clip_id ON uploads(clip_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_uploads_status ON uploads(status)`,
 ];
 
 async function migrate() {

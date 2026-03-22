@@ -2,9 +2,19 @@ const router = require('express').Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 const { createJob, createJobFromFile, getJob, listJobs } = require('../modules/downloader/job.service');
 const { getTranscription } = require('../modules/transcriber/transcription.service');
 const { getSuggestions } = require('../modules/analyzer/analyzer.service');
+
+const jobCreateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: { error: 'Limite de criação de jobs atingido. Aguarde 1 minuto.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const TEMP_DIR = process.env.TEMP_DIR || './tmp';
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -36,7 +46,7 @@ const chunkUpload = multer({
 });
 
 // POST /api/jobs — cria job e inicia download em background
-router.post('/', async (req, res, next) => {
+router.post('/', jobCreateLimiter, async (req, res, next) => {
   try {
     const { url } = req.body;
     if (!url || typeof url !== 'string') {

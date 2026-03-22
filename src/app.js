@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieSession = require('cookie-session');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const logger = require('./utils/logger').child({ module: 'app' });
 
@@ -34,6 +35,30 @@ app.use(helmet({ contentSecurityPolicy: false })); // CSP desabilitado para asse
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Rate limiting (desabilitado em testes para evitar falsos positivos)
+const isTest = process.env.NODE_ENV === 'test';
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: isTest ? 0 : 10,     // 0 = sem limite
+  skip: () => isTest,
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: isTest ? 0 : 120,
+  skip: () => isTest,
+  message: { error: 'Muitas requisições. Tente novamente em instantes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/auth/login', loginLimiter);
+app.use('/api', apiLimiter);
 
 // Session (24h)
 app.use(cookieSession({
