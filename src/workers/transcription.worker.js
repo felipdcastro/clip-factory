@@ -1,13 +1,15 @@
+'use strict';
+
+const { Worker } = require('bullmq');
 const { query } = require('../db/connection');
 const { processTranscription } = require('../modules/transcriber/transcription.service');
+const { connection, QUEUE_NAMES } = require('../queues');
 const logger = require('../utils/logger').child({ module: 'transcription-worker' });
 
-const POLL_INTERVAL_MS = 30 * 1000; // 30 segundos
-let isRunning = false;
+let worker = null;
 
 /**
  * Reseta jobs presos em 'transcribing' há mais de 10 minutos de volta para 'downloaded'
- * Protege contra crashes/reinicializações do servidor durante transcrição
  */
 async function resetStuckJobs() {
   const result = await query(
@@ -21,36 +23,39 @@ async function resetStuckJobs() {
   }
 }
 
-/**
- * Worker que detecta jobs com status 'downloaded' e inicia transcrição
- */
-async function runTranscriptionWorker() {
-  if (isRunning) return;
-  isRunning = true;
+function startTranscriptionWorker() {
+  resetStuckJobs().catch(err => logger.error({ err }, 'Erro ao resetar jobs presos'));
 
-  try {
-    const result = await query(
-      "SELECT id FROM jobs WHERE status='downloaded' ORDER BY created_at ASC LIMIT 1"
-    );
-
-    if (result.rows.length > 0) {
-      const jobId = result.rows[0].id;
-      logger.info({ job_id: jobId }, `Iniciando transcrição do job ${jobId}`);
+  worker = new Worker(
+    QUEUE_NAMES.TRANSCRIPTION,
+    async (job) => {
+      const { jobId } = job.data;
+      logger.info({ job_id: jobId, bull_job_id: job.id }, `Iniciando transcrição do job ${jobId}`);
       await processTranscription(jobId);
+    },
+    {
+      connection,
+      concurrency: 1, // uma transcrição por vez (AssemblyAI tem limites)
     }
-  } catch (err) {
-    logger.error({ err }, 'Transcription worker error');
-  } finally {
-    isRunning = false;
+  );
+
+  worker.on('completed', (job) => {
+    logger.info({ bull_job_id: job.id, job_id: job.data.jobId }, 'Transcrição concluída');
+  });
+
+  worker.on('failed', (job, err) => {
+    logger.error({ err, bull_job_id: job?.id, job_id: job?.data?.jobId }, 'Transcrição falhou');
+  });
+
+  logger.info('Transcription worker iniciado (BullMQ)');
+  return worker;
+}
+
+async function stopTranscriptionWorker() {
+  if (worker) {
+    await worker.close();
+    logger.info('Transcription worker encerrado');
   }
 }
 
-function startTranscriptionWorker() {
-  logger.info('Transcription worker iniciado (intervalo: 30s)');
-  resetStuckJobs().catch(err => logger.error({ err }, 'Erro ao resetar jobs presos'));
-  setInterval(runTranscriptionWorker, POLL_INTERVAL_MS);
-  // Executa imediatamente na primeira vez
-  runTranscriptionWorker();
-}
-
-module.exports = { startTranscriptionWorker };
+module.exports = { startTranscriptionWorker, stopTranscriptionWorker };

@@ -202,7 +202,7 @@ async function decideSuggestion(id, status, btn) {
   actions.innerHTML = renderDecidedActions({ id, status });
 
   if (status === 'approved') {
-    pollClipStatus(id, result.id);
+    pollClipStatus(id, null);
   }
 }
 
@@ -212,48 +212,44 @@ async function pollClipStatus(suggestionId, clipId) {
   const statusEl = document.getElementById(`clip-status-${suggestionId}`);
   if (!statusEl) return;
 
-  // Busca o clip_id associado à sugestão se não passado
-  if (!clipId) {
-    // O clip é criado pelo worker — aguarda até 10s antes de fazer poll
-    await new Promise(r => setTimeout(r, 3000));
-  }
+  statusEl.textContent = '⏳ Aguardando corte...';
 
   let attempts = 0;
   const poll = async () => {
     attempts++;
-    // Busca clips da sugestão via jobs
     const actionsEl = document.getElementById(`actions-${suggestionId}`);
-    if (!actionsEl) return;
+    if (!actionsEl) { clearInterval(poller); return; }
 
-    if (!clipId) {
-      // Tenta encontrar o clip pelo job (simplificado: usa o currentJobId)
-      const data = await api('GET', `/api/jobs/${currentJobId}/suggestions`);
-      if (data) {
-        data.suggestions.find(x => x.id === suggestionId);
-        // Clip ainda sendo criado pelo worker
-      }
-      if (attempts > 30) { clearInterval(poller); return; }
+    // Busca clip via suggestions endpoint (retorna clip_id e clip_status)
+    const data = await api('GET', `/api/jobs/${currentJobId}/suggestions`);
+    if (!data) { clearInterval(poller); return; }
+
+    const sug = data.suggestions.find(s => s.id === suggestionId);
+    if (!sug) { clearInterval(poller); return; }
+
+    const cId = clipId || sug.clip_id;
+    const cStatus = sug.clip_status;
+
+    if (!cId || !cStatus) {
+      if (attempts > 40) { clearInterval(poller); statusEl.textContent = '❌ Timeout'; }
       return;
     }
 
-    const clip = await api('GET', `/api/clips/${clipId}`);
-    if (!clip) { clearInterval(poller); return; }
-
-    if (clip.status === 'cutting') {
+    if (cStatus === 'cutting') {
       statusEl.textContent = '✂️ Cortando...';
       return;
     }
 
     clearInterval(poller);
 
-    if (clip.status === 'ready') {
+    if (cStatus === 'ready') {
       statusEl.className = 'clip-status ready';
       statusEl.textContent = '✓ Pronto!';
-      actionsEl.appendChild(buildUploadForm(clip, suggestionId));
+      actionsEl.appendChild(buildUploadForm({ id: cId }, suggestionId));
       return;
     }
 
-    if (clip.status === 'failed') {
+    if (cStatus === 'failed') {
       statusEl.textContent = '❌ Falha no corte';
     }
   };
@@ -397,6 +393,61 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 });
 
 // ── Form submit ────────────────────────────────────────────────────────────
+
+// ── Jobs recentes ──────────────────────────────────────────────────────────
+
+const STATUS_BADGE = {
+  pending:      { label: 'Pendente',     color: '#888' },
+  downloading:  { label: 'Baixando',     color: '#f5a623' },
+  downloaded:   { label: 'Baixado',      color: '#f5a623' },
+  transcribing: { label: 'Transcrevendo',color: '#f5a623' },
+  transcribed:  { label: 'Transcrito',   color: '#f5a623' },
+  analyzing:    { label: 'Analisando',   color: '#f5a623' },
+  analyzed:     { label: '✓ Pronto',     color: '#27ae60' },
+  failed:       { label: '✗ Falhou',     color: '#e74c3c' },
+};
+
+async function loadRecentJobs() {
+  const jobs = await api('GET', '/api/jobs');
+  if (!jobs || !jobs.length) return;
+
+  const list = document.getElementById('jobs-list');
+  list.innerHTML = '';
+
+  jobs.slice(0, 10).forEach(job => {
+    const badge = STATUS_BADGE[job.status] || { label: job.status, color: '#888' };
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;background:#1a1a1a;border-radius:6px;margin-bottom:6px;cursor:pointer;border:1px solid #2a2a2a';
+    row.innerHTML = `
+      <span style="background:${badge.color};color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:10px;white-space:nowrap">${badge.label}</span>
+      <span style="flex:1;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(job.title || job.url)}</span>
+      <span style="font-size:0.75rem;color:#666">#${job.id}</span>
+    `;
+    if (job.status === 'analyzed') {
+      row.addEventListener('click', () => {
+        currentJobId = job.id;
+        document.getElementById('suggestions-section').style.display = 'none';
+        loadSuggestions(job.id);
+        updateProgress(job.status);
+        window.scrollTo(0, 0);
+      });
+    } else if (['downloading','transcribing','analyzing','transcribed','downloaded','pending'].includes(job.status)) {
+      row.addEventListener('click', () => {
+        currentJobId = job.id;
+        updateProgress(job.status);
+        startPolling(job.id);
+        window.scrollTo(0, 0);
+      });
+    } else {
+      row.style.cursor = 'default';
+      row.title = job.error_message || '';
+    }
+    list.appendChild(row);
+  });
+}
+
+// Carrega jobs ao abrir a página
+loadRecentJobs();
 
 document.getElementById('url-form').addEventListener('submit', async (e) => {
   e.preventDefault();

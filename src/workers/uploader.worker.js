@@ -1,34 +1,43 @@
-const { query } = require('../db/connection');
+'use strict';
+
+const { Worker } = require('bullmq');
 const { processUpload } = require('../modules/uploader/uploader.service');
+const { connection, QUEUE_NAMES } = require('../queues');
 const logger = require('../utils/logger').child({ module: 'uploader-worker' });
 
-const POLL_INTERVAL_MS = 60 * 1000; // 1 minuto
+let worker = null;
 
-async function runUploaderWorker() {
-  try {
-    // Processa uploads na fila (respeitando scheduled_at — só publica quando a hora chegar)
-    const result = await query(
-      `SELECT id FROM uploads
-       WHERE status = 'queued'
-         AND (scheduled_at IS NULL OR scheduled_at <= NOW())
-       ORDER BY created_at ASC
-       LIMIT 1`
-    );
-
-    if (result.rows.length > 0) {
-      const uploadId = result.rows[0].id;
-      logger.info({ upload_id: uploadId }, `Processando upload ${uploadId}`);
+function startUploaderWorker() {
+  worker = new Worker(
+    QUEUE_NAMES.UPLOAD,
+    async (job) => {
+      const { uploadId } = job.data;
+      logger.info({ upload_id: uploadId, bull_job_id: job.id }, `Processando upload ${uploadId}`);
       await processUpload(uploadId);
+    },
+    {
+      connection,
+      concurrency: 1, // máx 1 upload simultâneo (quota YouTube API)
     }
-  } catch (err) {
-    logger.error({ err }, 'Uploader worker error');
+  );
+
+  worker.on('completed', (job) => {
+    logger.info({ bull_job_id: job.id, upload_id: job.data.uploadId }, 'Upload concluído');
+  });
+
+  worker.on('failed', (job, err) => {
+    logger.error({ err, bull_job_id: job?.id, upload_id: job?.data?.uploadId }, 'Upload falhou');
+  });
+
+  logger.info('Uploader worker iniciado (BullMQ)');
+  return worker;
+}
+
+async function stopUploaderWorker() {
+  if (worker) {
+    await worker.close();
+    logger.info('Uploader worker encerrado');
   }
 }
 
-function startUploaderWorker() {
-  logger.info('Uploader worker iniciado (intervalo: 60s)');
-  setInterval(runUploaderWorker, POLL_INTERVAL_MS);
-  runUploaderWorker();
-}
-
-module.exports = { startUploaderWorker };
+module.exports = { startUploaderWorker, stopUploaderWorker };

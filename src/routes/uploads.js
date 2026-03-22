@@ -30,9 +30,12 @@ router.post('/', async (req, res, next) => {
 
     const upload = result.rows[0];
 
-    // Dispara processamento em background (não aguarda)
-    processUpload(upload.id).catch(err => {
-      logger.error({ err, upload_id: upload.id }, `Upload ${upload.id} failed`);
+    // Enfileira para processamento via BullMQ (com delay para agendamentos)
+    const { enqueueUpload } = require('../queues');
+    enqueueUpload(upload.id, scheduled_at || null).catch(err => {
+      logger.error({ err, upload_id: upload.id }, `Falha ao enfileirar upload ${upload.id}`);
+      // Fallback: processa diretamente se fila indisponível
+      processUpload(upload.id).catch(e => logger.error({ err: e, upload_id: upload.id }, 'Fallback upload failed'));
     });
 
     res.status(201).json(upload);

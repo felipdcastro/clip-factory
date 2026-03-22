@@ -65,6 +65,10 @@ async function processJob(jobId, url) {
     );
 
     logger.info({ job_id: jobId, file: path.basename(filePath) }, `Job ${jobId} downloaded`);
+
+    // Publica na fila de transcrição imediatamente
+    const { enqueueTranscription } = require('../../queues');
+    await enqueueTranscription(jobId);
   } catch (err) {
     await query(
       `UPDATE jobs SET status='failed', error_message=$1, updated_at=NOW() WHERE id=$2`,
@@ -106,6 +110,11 @@ async function createJobFromFile(filePath, originalName) {
 
   const job = result.rows[0];
   logger.info({ job_id: job.id, file: originalName }, `Job ${job.id} criado via upload`);
+
+  // Arquivo já disponível — publica direto na fila de transcrição
+  const { enqueueTranscription } = require('../../queues');
+  await enqueueTranscription(job.id);
+
   return job;
 }
 

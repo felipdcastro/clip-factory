@@ -1,39 +1,43 @@
-const { query } = require('../db/connection');
+'use strict';
+
+const { Worker } = require('bullmq');
 const { processClip } = require('../modules/editor/editor.service');
+const { connection, QUEUE_NAMES } = require('../queues');
 const logger = require('../utils/logger').child({ module: 'editor-worker' });
 
-const POLL_INTERVAL_MS = 15 * 1000; // 15 segundos (mais frequente — usuário acabou de aprovar)
+let worker = null;
 
-async function runEditorWorker() {
-  try {
-    // Busca sugestões aprovadas que ainda não têm clip em corte ou pronto
-    const result = await query(
-      `SELECT cs.id
-       FROM clip_suggestions cs
-       LEFT JOIN clips c ON c.suggestion_id = cs.id
-       WHERE cs.status = 'approved'
-         AND c.id IS NULL
-       ORDER BY cs.created_at ASC
-       LIMIT 2`  // máx 2 por ciclo — alinhado com p-limit(2)
-    );
+function startEditorWorker() {
+  worker = new Worker(
+    QUEUE_NAMES.EDITOR,
+    async (job) => {
+      const { suggestionId } = job.data;
+      logger.info({ suggestion_id: suggestionId, bull_job_id: job.id }, `Cortando clip ${suggestionId}`);
+      await processClip(suggestionId);
+    },
+    {
+      connection,
+      concurrency: 2, // máx 2 cortes simultâneos (alinhado com p-limit anterior)
+    }
+  );
 
-    if (result.rows.length === 0) return;
+  worker.on('completed', (job) => {
+    logger.info({ bull_job_id: job.id, suggestion_id: job.data.suggestionId }, 'Corte concluído');
+  });
 
-    // Processa em paralelo (p-limit cuida do throttle interno)
-    await Promise.allSettled(
-      result.rows.map(row => processClip(row.id).catch(err => {
-        logger.error({ err, clip_id: row.id }, `Editor worker — clip ${row.id} falhou`);
-      }))
-    );
-  } catch (err) {
-    logger.error({ err }, 'Editor worker error');
+  worker.on('failed', (job, err) => {
+    logger.error({ err, bull_job_id: job?.id, suggestion_id: job?.data?.suggestionId }, 'Corte falhou');
+  });
+
+  logger.info('Editor worker iniciado (BullMQ)');
+  return worker;
+}
+
+async function stopEditorWorker() {
+  if (worker) {
+    await worker.close();
+    logger.info('Editor worker encerrado');
   }
 }
 
-function startEditorWorker() {
-  logger.info('Editor worker iniciado (intervalo: 15s)');
-  setInterval(runEditorWorker, POLL_INTERVAL_MS);
-  runEditorWorker();
-}
-
-module.exports = { startEditorWorker };
+module.exports = { startEditorWorker, stopEditorWorker };

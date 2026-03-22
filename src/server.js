@@ -1,3 +1,5 @@
+'use strict';
+
 const _dotenvResult = require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
 const logger = require('./utils/logger').child({ module: 'server' });
 
@@ -8,12 +10,14 @@ logger.info(_dotenvResult.error
 const app = require('./app');
 const { testConnection } = require('./db/connection');
 const { migrate } = require('./db/migrate');
-const { startTranscriptionWorker } = require('./workers/transcription.worker');
-const { startAnalyzerWorker } = require('./workers/analyzer.worker');
-const { startEditorWorker } = require('./workers/editor.worker');
-const { startUploaderWorker } = require('./workers/uploader.worker');
+const { closeQueues } = require('./queues');
+const { startTranscriptionWorker, stopTranscriptionWorker } = require('./workers/transcription.worker');
+const { startAnalyzerWorker, stopAnalyzerWorker } = require('./workers/analyzer.worker');
+const { startEditorWorker, stopEditorWorker } = require('./workers/editor.worker');
+const { startUploaderWorker, stopUploaderWorker } = require('./workers/uploader.worker');
 
 const PORT = process.env.PORT || 3000;
+let server = null;
 
 async function start() {
   try {
@@ -29,7 +33,7 @@ async function start() {
 
     // Validação de TOKEN_ENCRYPTION_KEY — obrigatória, falha no startup se ausente
     const { getKey } = require('./utils/crypto');
-    getKey(); // lança erro se TOKEN_ENCRYPTION_KEY ausente ou curta demais
+    getKey();
     logger.info('TOKEN_ENCRYPTION_KEY configurada');
 
     // Validação de variáveis de ambiente críticas
@@ -40,15 +44,41 @@ async function start() {
       logger.info('Variáveis de ambiente OK (AssemblyAI, OpenAI)');
     }
 
-    // Inicia workers de background
+    // Inicia workers BullMQ
     startTranscriptionWorker();
     startAnalyzerWorker();
     startEditorWorker();
     startUploaderWorker();
 
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       logger.info({ port: PORT }, `Clip Factory running on http://localhost:${PORT}`);
     });
+
+    // Graceful shutdown — finaliza jobs em andamento antes de encerrar
+    async function shutdown(signal) {
+      logger.info({ signal }, 'Sinal recebido — iniciando graceful shutdown');
+
+      // Para de aceitar novas conexões
+      if (server) server.close();
+
+      // Aguarda workers finalizarem jobs em andamento
+      await Promise.all([
+        stopTranscriptionWorker(),
+        stopAnalyzerWorker(),
+        stopEditorWorker(),
+        stopUploaderWorker(),
+      ]);
+
+      // Fecha conexões com Redis
+      await closeQueues();
+
+      logger.info('Shutdown concluído');
+      process.exit(0);
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);
