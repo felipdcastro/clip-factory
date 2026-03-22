@@ -48,7 +48,7 @@ jest.mock('../modules/analyzer/analyzer.service', () => ({
 
 jest.mock('../modules/uploader/uploader.service', () => ({
   processUpload: jest.fn().mockResolvedValue({ id: 1, status: 'uploaded' }),
-  retryUpload: jest.fn().mockResolvedValue(undefined),
+  retryUpload: jest.fn().mockResolvedValue({ uploadId: 1, status: 'queued' }),
   listUploads: jest.fn().mockResolvedValue([{ id: 1, status: 'queued' }]),
   getUpload: jest.fn().mockResolvedValue({ id: 1, status: 'queued' }),
 }));
@@ -263,11 +263,11 @@ describe('POST /api/uploads (autenticado)', () => {
 describe('POST /api/uploads/:id/retry (autenticado)', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('inicia retry e retorna mensagem', async () => {
+  it('enfileira retry via BullMQ e retorna status queued', async () => {
     const agent = await makeAuthAgent();
     const res = await agent.post('/api/uploads/1/retry');
     expect(res.status).toBe(200);
-    expect(res.body.message).toContain('Retry');
+    expect(res.body.status).toBe('queued');
     expect(res.body.upload_id).toBe(1);
   });
 });

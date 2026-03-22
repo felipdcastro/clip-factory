@@ -99,6 +99,15 @@ async function enqueueUpload(uploadId, scheduledAt = null) {
 }
 
 /**
+ * Remove job de upload da fila (necessário antes de re-enfileirar — BullMQ rejeita jobId duplicado)
+ * @param {number} uploadId
+ */
+async function removeUploadJob(uploadId) {
+  const job = await getQueues().upload.getJob(`upload-${uploadId}`);
+  if (job) await job.remove();
+}
+
+/**
  * Retorna status de todas as filas (waiting, active, failed, completed)
  */
 async function getQueuesStatus() {
@@ -135,6 +144,7 @@ module.exports = {
   enqueueAnalysis,
   enqueueClip,
   enqueueUpload,
+  removeUploadJob,
   getQueuesStatus,
   closeQueues,
 };

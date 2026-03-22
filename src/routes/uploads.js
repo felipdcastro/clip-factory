@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query } = require('../db/connection');
-const { processUpload, retryUpload, listUploads, getUpload } = require('../modules/uploader/uploader.service');
+const { retryUpload, listUploads, getUpload } = require('../modules/uploader/uploader.service');
 const logger = require('../utils/logger').child({ module: 'uploads-route' });
 
 // POST /api/uploads — agenda upload de um clip
@@ -32,10 +32,14 @@ router.post('/', async (req, res, next) => {
 
     // Enfileira para processamento via BullMQ (com delay para agendamentos)
     const { enqueueUpload } = require('../queues');
-    enqueueUpload(upload.id, scheduled_at || null).catch(err => {
-      logger.error({ err, upload_id: upload.id }, `Falha ao enfileirar upload ${upload.id}`);
-      // Fallback: processa diretamente se fila indisponível
-      processUpload(upload.id).catch(e => logger.error({ err: e, upload_id: upload.id }, 'Fallback upload failed'));
+    enqueueUpload(upload.id, scheduled_at || null).catch(async err => {
+      logger.error({ err, upload_id: upload.id }, `Falha ao enfileirar upload ${upload.id} — marcando como failed`);
+      // Não processa diretamente: evita duplicação se a fila se recuperar.
+      // Marca como failed para que o usuário possa usar o endpoint /retry.
+      await query(
+        "UPDATE uploads SET status='failed', error_message=$1, updated_at=NOW() WHERE id=$2",
+        ['Fila indisponível ao enfileirar. Use /retry para reprocessar.', upload.id]
+      ).catch(dbErr => logger.error({ err: dbErr, upload_id: upload.id }, 'Falha ao marcar upload como failed'));
     });
 
     res.status(201).json(upload);
@@ -65,13 +69,11 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// POST /api/uploads/:id/retry — reprocessa upload em status 'failed'
+// POST /api/uploads/:id/retry — reprocessa upload em status 'failed' (enfileira via BullMQ)
 router.post('/:id/retry', async (req, res, next) => {
   try {
-    retryUpload(req.params.id).catch(err => {
-      logger.error({ err, upload_id: req.params.id }, `Retry upload ${req.params.id} failed`);
-    });
-    res.json({ message: 'Retry iniciado', upload_id: Number(req.params.id) });
+    const result = await retryUpload(req.params.id);
+    res.json({ status: result.status, upload_id: result.uploadId });
   } catch (err) {
     next(err);
   }

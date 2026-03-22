@@ -1,14 +1,5 @@
 const { AssemblyAI } = require('assemblyai');
 
-const _POLITICAL_WORD_BOOST = [
-  'MBL', 'Movimento Brasil Livre', 'Kim Kataguiri', 'Arthur do Val',
-  'reforma tributária', 'impeachment', 'STF', 'Supremo Tribunal Federal',
-  'congresso', 'senado', 'câmara', 'deputado', 'senador', 'presidente',
-  'bolsonaro', 'lula', 'PT', 'PL', 'PSOL', 'PSDB', 'MDB',
-  'privatização', 'estatização', 'neoliberal', 'socialismo',
-  'pautar', 'votar', 'aprovado', 'rejeitado', 'sessão', 'plenário',
-];
-
 /**
  * Transcreve um arquivo de áudio usando AssemblyAI
  * Retorna o texto completo e palavras com timestamps
@@ -23,7 +14,7 @@ async function transcribeAudio(audioPath) {
   const transcript = await client.transcripts.transcribe({
     audio: audioPath,
     language_code: process.env.TRANSCRIPTION_LANGUAGE || 'pt',
-    speech_models: ['universal-2'],
+    speech_model: 'universal-2',
   });
 
   if (transcript.status === 'error') {

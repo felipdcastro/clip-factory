@@ -17,9 +17,15 @@ jest.mock('../../utils/retry', () => ({
   withRetry: jest.fn().mockImplementation(async (fn) => fn()),
 }));
 
+jest.mock('../../queues', () => ({
+  enqueueUpload: jest.fn().mockResolvedValue(undefined),
+  removeUploadJob: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { query } = require('../../db/connection');
 const { uploadToYouTube, cleanupClipFile } = require('./youtube-upload.service');
 const { isAuthenticated } = require('./youtube-auth.service');
+const { enqueueUpload, removeUploadJob } = require('../../queues');
 const { processUpload, retryUpload, getUpload, listUploads } = require('./uploader.service');
 
 describe('processUpload', () => {
@@ -121,6 +127,30 @@ describe('retryUpload', () => {
     query.mockResolvedValueOnce({ rows: [{ id: 1, status: 'uploading' }] });
     const err = await retryUpload(1).catch(e => e);
     expect(err.status).toBe(400);
+  });
+
+  it('remove job antigo, reseta status para queued e enfileira via BullMQ', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 5, status: 'failed' }] })  // SELECT
+      .mockResolvedValueOnce({ rows: [] });                              // UPDATE queued
+
+    const result = await retryUpload(5);
+
+    expect(removeUploadJob).toHaveBeenCalledWith(5);
+    expect(enqueueUpload).toHaveBeenCalledWith(5);
+    expect(result).toEqual({ uploadId: 5, status: 'queued' });
+  });
+
+  it('não chama processUpload diretamente (garante uso do BullMQ)', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 6, status: 'failed' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await retryUpload(6);
+
+    // enqueueUpload chamado — não uploadToYouTube diretamente
+    expect(enqueueUpload).toHaveBeenCalledWith(6);
+    expect(uploadToYouTube).not.toHaveBeenCalled();
   });
 });
 

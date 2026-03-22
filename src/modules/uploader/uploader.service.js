@@ -5,6 +5,7 @@ const { query } = require('../../db/connection');
 const { uploadToYouTube, cleanupClipFile } = require('./youtube-upload.service');
 const { isAuthenticated } = require('./youtube-auth.service');
 const { withRetry } = require('../../utils/retry');
+const { enqueueUpload, removeUploadJob } = require('../../queues');
 
 // Throttle: máx 1 upload simultâneo (quota YouTube API)
 const limit = pLimit(1);
@@ -40,6 +41,10 @@ async function processUpload(uploadId) {
 
   try {
     // 4. Upload com retry automático (throttled)
+    // Double retry intencional:
+    // withRetry (maxAttempts: 3) → retenta falhas de rede dentro do worker (rápido, backoff 1s-4s)
+    // BullMQ (attempts: 3 em queues/index.js) → retenta falha total do worker (lento, backoff 2s+)
+    // Total máx: 9 tentativas para erros retriáveis (429, 5xx, ECONNRESET, etc.)
     const { videoId, videoUrl } = await withRetry(
       () => limit(() =>
         uploadToYouTube(
@@ -91,7 +96,8 @@ async function processUpload(uploadId) {
 }
 
 /**
- * Reprocessa manualmente um upload em status 'failed'.
+ * Reprocessa manualmente um upload em status 'failed' via fila BullMQ.
+ * Remove o job antigo da fila (BullMQ rejeita jobId duplicado) e re-enfileira.
  */
 async function retryUpload(uploadId) {
   const result = await query('SELECT * FROM uploads WHERE id=$1', [uploadId]);
@@ -105,13 +111,17 @@ async function retryUpload(uploadId) {
     );
   }
 
-  // Volta para queued e dispara processamento
+  // Remove job antigo da fila (evita conflito de jobId duplicado no BullMQ)
+  await removeUploadJob(uploadId);
+
+  // Volta para queued e enfileira via BullMQ (respeita concurrency e quota YouTube)
   await query(
-    "UPDATE uploads SET status='queued', failure_reason=NULL WHERE id=$1",
+    "UPDATE uploads SET status='queued', retry_count=retry_count+1, failure_reason=NULL WHERE id=$1",
     [uploadId]
   );
 
-  return processUpload(uploadId);
+  await enqueueUpload(uploadId);
+  return { uploadId, status: 'queued' };
 }
 
 async function getUpload(uploadId) {

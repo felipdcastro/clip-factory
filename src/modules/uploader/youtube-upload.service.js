@@ -59,13 +59,14 @@ async function uploadToYouTube(filePath, title, description, type, scheduledAt) 
 
   logger.info({ title, size_mb: parseFloat((fileSize / 1024 / 1024).toFixed(1)) }, `Iniciando upload: ${title}`);
 
+  const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutos — suficiente para vídeos grandes
   const response = await youtube.videos.insert({
     part: ['snippet', 'status'],
     requestBody: resource,
     media: {
       body: fs.createReadStream(filePath),
     },
-  });
+  }, { timeout: UPLOAD_TIMEOUT_MS });
 
   const videoId = response.data.id;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;

@@ -98,10 +98,8 @@ async function getAuthenticatedClient() {
       const { credentials } = await client.refreshAccessToken();
       await saveTokens(credentials);
       client.setCredentials({
-        access_token: decryptToken(encryptToken(credentials.access_token)),
-        refresh_token: credentials.refresh_token
-          ? decryptToken(encryptToken(credentials.refresh_token))
-          : refreshToken,
+        access_token: credentials.access_token,
+        refresh_token: credentials.refresh_token || refreshToken,
         expiry_date: credentials.expiry_date,
       });
     } catch (refreshErr) {

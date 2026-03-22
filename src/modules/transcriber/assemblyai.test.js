@@ -33,7 +33,7 @@ describe('transcribeAudio', () => {
     expect(result.words).toHaveLength(1);
     expect(result.audio_duration).toBe(120);
     expect(mockTranscribe).toHaveBeenCalledWith(
-      expect.objectContaining({ audio: '/tmp/audio.wav' })
+      expect.objectContaining({ audio: '/tmp/audio.wav', speech_model: 'universal-2' })
     );
   });
 

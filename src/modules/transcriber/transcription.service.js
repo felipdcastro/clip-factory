@@ -65,7 +65,7 @@ async function processTranscription(jobId) {
     await query(
       "UPDATE jobs SET status='failed', error_message=$1, updated_at=NOW() WHERE id=$2",
       [err.message, jobId]
-    ).catch(() => {}); // ignora erro secundário de DB
+    ).catch(dbErr => logger.error({ err: dbErr, job_id: jobId }, 'Falha ao atualizar status do job para failed'));
     throw err;
   } finally {
     // Cleanup do áudio temporário sempre executa
