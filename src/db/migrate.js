@@ -78,6 +78,10 @@ const migrations = [
   // Story 5.1: adicionar auth_status à tabela oauth_tokens (idempotente)
   `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS auth_status TEXT NOT NULL DEFAULT 'active'
    CHECK (auth_status IN ('active', 'expired'))`,
+
+  // Story 5.2: retry_count e failure_reason na tabela uploads
+  `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS failure_reason TEXT`,
 ];
 
 async function migrate() {

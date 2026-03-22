@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query } = require('../db/connection');
-const { processUpload, listUploads, getUpload } = require('../modules/uploader/uploader.service');
+const { processUpload, retryUpload, listUploads, getUpload } = require('../modules/uploader/uploader.service');
 
 // POST /api/uploads — agenda upload de um clip
 router.post('/', async (req, res, next) => {
@@ -56,6 +56,18 @@ router.get('/:id', async (req, res, next) => {
     const upload = await getUpload(req.params.id);
     if (!upload) return res.status(404).json({ error: 'Upload não encontrado' });
     res.json(upload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/uploads/:id/retry — reprocessa upload em status 'failed'
+router.post('/:id/retry', async (req, res, next) => {
+  try {
+    retryUpload(req.params.id).catch(err => {
+      console.error(`Retry upload ${req.params.id} failed:`, err.message);
+    });
+    res.json({ message: 'Retry iniciado', upload_id: Number(req.params.id) });
   } catch (err) {
     next(err);
   }
