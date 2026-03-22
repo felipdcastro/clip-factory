@@ -68,16 +68,28 @@ const schema = `
     access_token TEXT NOT NULL,
     refresh_token TEXT,
     expires_at   TIMESTAMPTZ,
+    auth_status  TEXT NOT NULL DEFAULT 'active' CHECK (auth_status IN ('active', 'expired')),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 `;
+
+const migrations = [
+  // Story 5.1: adicionar auth_status à tabela oauth_tokens (idempotente)
+  `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS auth_status TEXT NOT NULL DEFAULT 'active'
+   CHECK (auth_status IN ('active', 'expired'))`,
+];
 
 async function migrate() {
   const client = await pool.connect();
   try {
     console.log('🔄 Running migrations...');
     await client.query(schema);
+
+    for (const migration of migrations) {
+      await client.query(migration);
+    }
+
     console.log('✅ Migrations complete');
   } finally {
     client.release();
