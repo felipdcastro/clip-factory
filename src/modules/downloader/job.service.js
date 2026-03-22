@@ -2,6 +2,7 @@ const { query } = require('../../db/connection');
 const { isValidYouTubeUrl, getVideoMetadata, downloadVideo, MAX_DURATION_SECONDS } = require('./yt-dlp');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../../utils/logger').child({ module: 'downloader' });
 
 const TEMP_DIR = process.env.TEMP_DIR || './tmp';
 
@@ -27,7 +28,7 @@ async function createJob(url) {
 
   // Inicia processamento assíncrono (não aguarda)
   processJob(job.id, url).catch(err => {
-    console.error(`Job ${job.id} failed:`, err.message);
+    logger.error({ err, job_id: job.id }, `Job ${job.id} failed`);
   });
 
   return job;
@@ -63,7 +64,7 @@ async function processJob(jobId, url) {
       [filePath, jobId]
     );
 
-    console.log(`✅ Job ${jobId} downloaded: ${path.basename(filePath)}`);
+    logger.info({ job_id: jobId, file: path.basename(filePath) }, `Job ${jobId} downloaded`);
   } catch (err) {
     await query(
       `UPDATE jobs SET status='failed', error_message=$1, updated_at=NOW() WHERE id=$2`,
@@ -95,15 +96,16 @@ async function listJobs() {
  */
 async function createJobFromFile(filePath, originalName) {
   const title = path.basename(originalName, path.extname(originalName));
+  const absolutePath = path.resolve(filePath);
 
   const result = await query(
     `INSERT INTO jobs (url, title, status, file_path, updated_at)
      VALUES ($1, $2, 'downloaded', $3, NOW()) RETURNING *`,
-    [`file://${originalName}`, title, filePath]
+    [`file://${originalName}`, title, absolutePath]
   );
 
   const job = result.rows[0];
-  console.log(`✅ Job ${job.id} criado via upload: ${originalName}`);
+  logger.info({ job_id: job.id, file: originalName }, `Job ${job.id} criado via upload`);
   return job;
 }
 

@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieSession = require('cookie-session');
 const path = require('path');
+const logger = require('./utils/logger').child({ module: 'app' });
 
 const healthRouter = require('./routes/health');
 const jobsRouter = require('./routes/jobs');
@@ -12,6 +13,20 @@ const authRouter = require('./routes/auth');
 const uploadsRouter = require('./routes/uploads');
 
 const app = express();
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info({
+      method: req.method,
+      url: req.url,
+      status: res.statusCode,
+      duration_ms: Date.now() - start,
+    }, `${req.method} ${req.url} ${res.statusCode}`);
+  });
+  next();
+});
 
 // Security & parsing middlewares
 app.use(helmet({ contentSecurityPolicy: false })); // CSP desabilitado para assets inline no MVP
@@ -60,8 +75,8 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, _next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({
+  logger.error({ err, method: req.method, url: req.url }, 'Unhandled error');
+  res.status(err.status || 500).json({
     error: 'Erro interno do servidor',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined,
   });

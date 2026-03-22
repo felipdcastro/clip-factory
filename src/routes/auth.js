@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { getAuthUrl, exchangeCodeForTokens, isAuthenticated } = require('../modules/uploader/youtube-auth.service');
+const logger = require('../utils/logger').child({ module: 'auth' });
 
 // GET /auth/youtube — redireciona para autorização Google
 router.get('/youtube', (req, res) => {
@@ -19,7 +20,7 @@ router.get('/youtube/callback', async (req, res) => {
     await exchangeCodeForTokens(code);
     res.redirect('/?youtube_auth=success');
   } catch (err) {
-    console.error('YouTube OAuth callback error:', err.message);
+    logger.error({ err }, 'YouTube OAuth callback error');
     res.redirect('/?youtube_auth=error');
   }
 });

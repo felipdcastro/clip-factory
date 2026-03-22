@@ -1,9 +1,11 @@
 const { query } = require('../../db/connection');
 const { analyzeTranscription } = require('./openai.service');
+const logger = require('../../utils/logger').child({ module: 'analyzer' });
 
-const MIN_CLIP_SECONDS = 30;
+const MIN_REEL_SECONDS = 45;
+const MAX_REEL_SECONDS = 60;
+const MIN_VIDEO_SECONDS = 5 * 60;  // 5 min
 const MAX_VIDEO_SECONDS = 10 * 60; // 10 min
-const MAX_REEL_SECONDS = 90;       // 90s
 
 /**
  * Valida uma sugestão retornada pelo GPT
@@ -15,10 +17,8 @@ function validateSuggestion(s, jobDuration) {
   if (jobDuration && s.end_time > jobDuration) return false;
 
   const duration = s.end_time - s.start_time;
-  if (duration < MIN_CLIP_SECONDS) return false;
-
-  if (s.type === 'video' && duration > MAX_VIDEO_SECONDS) return false;
-  if (s.type === 'reel' && duration > MAX_REEL_SECONDS) return false;
+  if (s.type === 'reel' && (duration < MIN_REEL_SECONDS || duration > MAX_REEL_SECONDS)) return false;
+  if (s.type === 'video' && (duration < MIN_VIDEO_SECONDS || duration > MAX_VIDEO_SECONDS)) return false;
   if (!['video', 'reel'].includes(s.type)) return false;
   if (!s.title || typeof s.title !== 'string') return false;
 
@@ -84,7 +84,7 @@ async function processAnalysis(jobId) {
 
     const videoCount = validSuggestions.filter(s => s.type === 'video').length;
     const reelCount = validSuggestions.filter(s => s.type === 'reel').length;
-    console.log(`✅ Job ${jobId} analisado — ${videoCount} vídeos + ${reelCount} reels sugeridos`);
+    logger.info({ job_id: jobId, video_count: videoCount, reel_count: reelCount }, `Job ${jobId} analisado`);
 
     return validSuggestions;
   } catch (err) {
@@ -98,7 +98,11 @@ async function processAnalysis(jobId) {
 
 async function getSuggestions(jobId) {
   const result = await query(
-    'SELECT * FROM clip_suggestions WHERE job_id=$1 ORDER BY start_time ASC',
+    `SELECT cs.*, c.id as clip_id, c.status as clip_status
+     FROM clip_suggestions cs
+     LEFT JOIN clips c ON c.suggestion_id = cs.id
+     WHERE cs.job_id=$1
+     ORDER BY cs.start_time ASC`,
     [jobId]
   );
   return result.rows;

@@ -1,11 +1,12 @@
 const OpenAI = require('openai');
+const logger = require('../../utils/logger').child({ module: 'openai' });
 
 const SYSTEM_PROMPT = `Você é um especialista em criação de conteúdo para YouTube focado em política brasileira.
 Seu trabalho é analisar transcrições de vídeos do MBL (Movimento Brasil Livre) e identificar os melhores momentos para cortes virais.
 
 REGRAS:
-- Sugira exatamente 5 a 8 clipes do tipo "video" (formato horizontal, 2 a 10 minutos cada)
-- Sugira exatamente 5 a 8 clipes do tipo "reel" (formato vertical/shorts, 30 a 90 segundos cada)
+- Sugira exatamente 5 a 8 clipes do tipo "video" (formato horizontal, MÍNIMO 5 minutos e MÁXIMO 10 minutos cada)
+- Sugira exatamente 5 a 8 clipes do tipo "reel" (formato vertical/shorts, MÍNIMO 45 segundos e MÁXIMO 60 segundos cada)
 - Priorize: declarações polêmicas, debates acalorados, momentos marcantes, frases de impacto
 - Títulos devem ser chamativos e adequados para YouTube (máx 70 caracteres)
 - O campo "reason" deve explicar por que aquele trecho é viral/relevante
@@ -37,23 +38,30 @@ FORMATO DE RESPOSTA (JSON obrigatório):
 function formatTranscriptionForPrompt(text, words, durationSeconds) {
   const minutes = Math.floor(durationSeconds / 60);
 
-  // Cria marcadores de tempo a cada 30 segundos para orientar o GPT
-  const timeMarkers = [];
+  // Intercala marcadores de tempo [Xm Ys] a cada 30 segundos no texto
+  let timedText = '';
   if (Array.isArray(words) && words.length > 0) {
-    let currentMarker = 30;
+    let nextMarkerSec = 0;
     words.forEach(word => {
-      const wordStart = word.start / 1000; // ms → s
-      if (wordStart >= currentMarker) {
-        timeMarkers.push(`[${currentMarker}s] `);
-        currentMarker += 30;
+      const wordStartSec = word.start / 1000;
+      if (wordStartSec >= nextMarkerSec) {
+        const m = Math.floor(nextMarkerSec / 60);
+        const s = Math.floor(nextMarkerSec % 60);
+        timedText += `\n[${m}m${String(s).padStart(2,'0')}s] `;
+        nextMarkerSec += 30;
       }
+      timedText += word.text + ' ';
     });
+  } else {
+    timedText = text;
   }
 
   return `DURAÇÃO TOTAL: ${minutes} minutos (${durationSeconds} segundos)
 
-TRANSCRIÇÃO COMPLETA:
-${text}`;
+IMPORTANTE: Os marcadores [Xm Ys] indicam o timestamp exato no vídeo. Use esses valores para definir start_time e end_time em segundos.
+
+TRANSCRIÇÃO COM TIMESTAMPS:
+${timedText.trim()}`;
 }
 
 /**
@@ -83,7 +91,7 @@ function chunkTranscription(text, words, maxTokens = 80000) {
   const chunk1Text = chunk1Words.map(w => w.text).join(' ');
   const chunk2Text = chunk2Words.map(w => w.text).join(' ');
 
-  console.log(`⚠️  Transcrição longa (${estimatedTokens} tokens) — dividida em 2 chunks`);
+  logger.warn({ estimated_tokens: estimatedTokens }, `Transcrição longa — dividida em 2 chunks`);
   return [
     { text: chunk1Text, words: chunk1Words },
     { text: chunk2Text, words: chunk2Words },

@@ -54,9 +54,9 @@ async function processUpload(uploadId) {
         maxAttempts: MAX_UPLOAD_ATTEMPTS,
         baseDelayMs: 1000,
         onRetry: async ({ attempt, error, nextRetryInMs }) => {
-          console.log(
-            `[uploader] Upload ${uploadId} falhou (tentativa ${attempt}/${MAX_UPLOAD_ATTEMPTS}). ` +
-            `Erro: ${error.message}. Retry em ${nextRetryInMs}ms`
+          require('../../utils/logger').child({ module: 'uploader' }).warn(
+            { upload_id: uploadId, attempt, next_retry_ms: nextRetryInMs, err: error },
+            `Upload ${uploadId} falhou (tentativa ${attempt}/${MAX_UPLOAD_ATTEMPTS})`
           );
           await query(
             'UPDATE uploads SET retry_count = retry_count + 1 WHERE id=$1',

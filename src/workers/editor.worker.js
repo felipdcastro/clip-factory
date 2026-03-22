@@ -1,5 +1,6 @@
 const { query } = require('../db/connection');
 const { processClip } = require('../modules/editor/editor.service');
+const logger = require('../utils/logger').child({ module: 'editor-worker' });
 
 const POLL_INTERVAL_MS = 15 * 1000; // 15 segundos (mais frequente — usuário acabou de aprovar)
 
@@ -21,16 +22,16 @@ async function runEditorWorker() {
     // Processa em paralelo (p-limit cuida do throttle interno)
     await Promise.allSettled(
       result.rows.map(row => processClip(row.id).catch(err => {
-        console.error(`Editor worker — clip ${row.id} falhou:`, err.message);
+        logger.error({ err, clip_id: row.id }, `Editor worker — clip ${row.id} falhou`);
       }))
     );
   } catch (err) {
-    console.error('Editor worker error:', err.message);
+    logger.error({ err }, 'Editor worker error');
   }
 }
 
 function startEditorWorker() {
-  console.log('✂️  Editor worker iniciado (intervalo: 15s)');
+  logger.info('Editor worker iniciado (intervalo: 15s)');
   setInterval(runEditorWorker, POLL_INTERVAL_MS);
   runEditorWorker();
 }

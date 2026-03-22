@@ -1,6 +1,7 @@
 const { google } = require('googleapis');
 const fs = require('fs');
 const { getAuthenticatedClient } = require('./youtube-auth.service');
+const logger = require('../../utils/logger').child({ module: 'uploader' });
 
 const DEFAULT_TAGS = ['política', 'MBL', 'cortes', 'brasil', 'politica brasileira'];
 const CATEGORY_NEWS_POLITICS = '25';
@@ -56,7 +57,7 @@ async function uploadToYouTube(filePath, title, description, type, scheduledAt) 
   const fileSize = fs.statSync(filePath).size;
   const resource = buildVideoMetadata(title, description, type, scheduledAt);
 
-  console.log(`📤 Iniciando upload: ${title} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`);
+  logger.info({ title, size_mb: parseFloat((fileSize / 1024 / 1024).toFixed(1)) }, `Iniciando upload: ${title}`);
 
   const response = await youtube.videos.insert({
     part: ['snippet', 'status'],
@@ -69,7 +70,7 @@ async function uploadToYouTube(filePath, title, description, type, scheduledAt) 
   const videoId = response.data.id;
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  console.log(`✅ Upload concluído: ${videoUrl}`);
+  logger.info({ video_id: videoId, video_url: videoUrl }, `Upload concluído`);
   return { videoId, videoUrl };
 }
 
@@ -80,10 +81,10 @@ function cleanupClipFile(filePath) {
   try {
     if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`🗑️  Arquivo removido: ${filePath}`);
+      logger.info({ file_path: filePath }, `Arquivo removido após upload`);
     }
   } catch (err) {
-    console.warn(`Falha ao remover arquivo ${filePath}:`, err.message);
+    logger.warn({ err, file_path: filePath }, `Falha ao remover arquivo`);
   }
 }
 

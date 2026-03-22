@@ -87,14 +87,14 @@ const migrations = [
 async function migrate() {
   const client = await pool.connect();
   try {
-    console.log('🔄 Running migrations...');
+    require('../utils/logger').info('Running migrations...');
     await client.query(schema);
 
     for (const migration of migrations) {
       await client.query(migration);
     }
 
-    console.log('✅ Migrations complete');
+    require('../utils/logger').info('Migrations complete');
   } finally {
     client.release();
   }

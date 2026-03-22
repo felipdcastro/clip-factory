@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const logger = require('../utils/logger').child({ module: 'db' });
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -6,7 +7,7 @@ const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('PostgreSQL pool error:', err);
+  logger.error({ err }, 'PostgreSQL pool error');
 });
 
 async function query(text, params) {
@@ -14,7 +15,7 @@ async function query(text, params) {
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
   if (process.env.NODE_ENV === 'development') {
-    console.log('query', { text, duration, rows: res.rowCount });
+    logger.debug({ query: text, duration_ms: duration, rows: res.rowCount }, 'DB query');
   }
   return res;
 }
@@ -22,7 +23,7 @@ async function query(text, params) {
 async function testConnection() {
   const client = await pool.connect();
   client.release();
-  console.log('✅ PostgreSQL connected');
+  logger.info('PostgreSQL connected');
 }
 
 module.exports = { query, pool, testConnection };

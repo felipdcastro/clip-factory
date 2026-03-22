@@ -1,6 +1,7 @@
 const { query } = require('../../db/connection');
 const { extractAudio, cleanupAudio } = require('./audio-extractor');
 const { transcribeAudio } = require('./assemblyai.service');
+const logger = require('../../utils/logger').child({ module: 'transcriber' });
 
 const ASSEMBLYAI_COST_PER_HOUR = 0.37;
 
@@ -34,7 +35,7 @@ async function processTranscription(jobId) {
     // 5. Calcula custo estimado
     const durationHours = (result.audio_duration || job.duration_seconds || 0) / 3600;
     const estimatedCost = parseFloat((durationHours * ASSEMBLYAI_COST_PER_HOUR).toFixed(4));
-    console.log(`💰 Job ${jobId} — custo estimado transcrição: $${estimatedCost}`);
+    logger.info({ job_id: jobId, estimated_cost_usd: estimatedCost }, `Job ${jobId} — custo estimado transcrição: $${estimatedCost}`);
 
     // 6. Salva transcrição
     await query(
@@ -52,8 +53,15 @@ async function processTranscription(jobId) {
     // 7. Atualiza status do job
     await query("UPDATE jobs SET status='transcribed', updated_at=NOW() WHERE id=$1", [jobId]);
 
-    console.log(`✅ Job ${jobId} transcrito com sucesso`);
+    logger.info({ job_id: jobId }, `Job ${jobId} transcrito com sucesso`);
     return result;
+  } catch (err) {
+    // Garante que o job não fica preso em 'transcribing' em caso de falha
+    await query(
+      "UPDATE jobs SET status='failed', error_message=$1, updated_at=NOW() WHERE id=$2",
+      [err.message, jobId]
+    ).catch(() => {}); // ignora erro secundário de DB
+    throw err;
   } finally {
     // Cleanup do áudio temporário sempre executa
     if (audioPath) cleanupAudio(audioPath);
