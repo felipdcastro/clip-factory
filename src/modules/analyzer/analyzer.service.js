@@ -1,26 +1,30 @@
 const { query } = require('../../db/connection');
-const { analyzeTranscription } = require('./openai.service');
+const { analyzeTranscription, VALID_CLIP_CATEGORIES } = require('./openai.service');
 const logger = require('../../utils/logger').child({ module: 'analyzer' });
 
-const MIN_REEL_SECONDS = 45;
-const MAX_REEL_SECONDS = 60;
-const MIN_VIDEO_SECONDS = 5 * 60;  // 5 min
-const MAX_VIDEO_SECONDS = 10 * 60; // 10 min
+const LIMITS_BY_CONTENT_TYPE = {
+  mbl:               { minReel: 45, maxReel: 60,  minVideo: 300,  maxVideo: 600  },
+  'batalha-de-rima': { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 1200 },
+  toguro:            { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 720  },
+  'lol-esports':     { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 600  },
+};
 
 /**
  * Valida uma sugestão retornada pelo GPT
  */
-function validateSuggestion(s, jobDuration) {
+function validateSuggestion(s, jobDuration, contentType = 'mbl') {
   if (typeof s.start_time !== 'number' || typeof s.end_time !== 'number') return false;
   if (s.start_time < 0) return false;
   if (s.end_time <= s.start_time) return false;
   if (jobDuration && s.end_time > jobDuration) return false;
 
+  const limits = LIMITS_BY_CONTENT_TYPE[contentType] || LIMITS_BY_CONTENT_TYPE.mbl;
   const duration = s.end_time - s.start_time;
-  if (s.type === 'reel' && (duration < MIN_REEL_SECONDS || duration > MAX_REEL_SECONDS)) return false;
-  if (s.type === 'video' && (duration < MIN_VIDEO_SECONDS || duration > MAX_VIDEO_SECONDS)) return false;
+  if (s.type === 'reel' && (duration < limits.minReel || duration > limits.maxReel)) return false;
+  if (s.type === 'video' && (duration < limits.minVideo || duration > limits.maxVideo)) return false;
   if (!['video', 'reel'].includes(s.type)) return false;
   if (!s.title || typeof s.title !== 'string') return false;
+  if (s.clip_category !== undefined && !VALID_CLIP_CATEGORIES.includes(s.clip_category)) return false;
 
   return true;
 }
@@ -60,11 +64,12 @@ async function processAnalysis(jobId) {
     const rawSuggestions = await analyzeTranscription(
       transcription.text,
       words,
-      job.duration_seconds
+      job.duration_seconds,
+      job.content_type
     );
 
     // 5. Valida e filtra sugestões
-    const validSuggestions = rawSuggestions.filter(s => validateSuggestion(s, job.duration_seconds));
+    const validSuggestions = rawSuggestions.filter(s => validateSuggestion(s, job.duration_seconds, job.content_type));
 
     if (validSuggestions.length === 0) {
       throw new Error('GPT não retornou sugestões válidas');
@@ -72,10 +77,13 @@ async function processAnalysis(jobId) {
 
     // 6. Salva no banco
     for (const s of validSuggestions) {
+      const reason = s.clip_category
+        ? `[CATEGORY: ${s.clip_category}] ${s.reason}`
+        : s.reason;
       await query(
         `INSERT INTO clip_suggestions (job_id, start_time, end_time, title, reason, type, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
-        [jobId, s.start_time, s.end_time, s.title.substring(0, 100), s.reason, s.type]
+        [jobId, s.start_time, s.end_time, s.title.substring(0, 100), reason, s.type]
       );
     }
 

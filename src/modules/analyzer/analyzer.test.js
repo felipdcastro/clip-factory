@@ -6,6 +6,7 @@ jest.mock('../../db/connection', () => ({
 jest.mock('./openai.service', () => ({
   analyzeTranscription: jest.fn(),
   estimateTokens: jest.requireActual('./openai.service').estimateTokens,
+  VALID_CLIP_CATEGORIES: jest.requireActual('./openai.service').VALID_CLIP_CATEGORIES,
 }));
 
 const { query } = require('../../db/connection');
@@ -46,6 +47,85 @@ describe('validateSuggestion', () => {
 
   it('rejeita end_time além da duração do job', () => {
     expect(validateSuggestion({ ...base, end_time: 5000 }, 3600)).toBe(false);
+  });
+});
+
+describe('validateSuggestion — lol-esports', () => {
+  const lolBase = { start_time: 0, end_time: 300, title: 'Faker Penta', reason: 'Epic', type: 'video' };
+
+  it('aceita video lol-esports válido (300s = 5 min)', () => {
+    expect(validateSuggestion(lolBase, 7200, 'lol-esports')).toBe(true);
+  });
+
+  it('rejeita video lol-esports curto (120s < 180s min)', () => {
+    expect(validateSuggestion({ ...lolBase, end_time: 120 }, 7200, 'lol-esports')).toBe(false);
+  });
+
+  it('aceita reel lol-esports válido (60s)', () => {
+    expect(validateSuggestion({ ...lolBase, end_time: 60, type: 'reel' }, 7200, 'lol-esports')).toBe(true);
+  });
+
+  it('rejeita reel lol-esports curto (25s < 30s min)', () => {
+    expect(validateSuggestion({ ...lolBase, end_time: 25, type: 'reel' }, 7200, 'lol-esports')).toBe(false);
+  });
+
+  it('aceita sugestão com clip_category válido', () => {
+    expect(validateSuggestion({ ...lolBase, clip_category: 'highlight' }, 7200, 'lol-esports')).toBe(true);
+    expect(validateSuggestion({ ...lolBase, clip_category: 'educational' }, 7200, 'lol-esports')).toBe(true);
+    expect(validateSuggestion({ ...lolBase, clip_category: 'funny' }, 7200, 'lol-esports')).toBe(true);
+  });
+
+  it('rejeita sugestão com clip_category inválido', () => {
+    expect(validateSuggestion({ ...lolBase, clip_category: 'invalid' }, 7200, 'lol-esports')).toBe(false);
+    expect(validateSuggestion({ ...lolBase, clip_category: '' }, 7200, 'lol-esports')).toBe(false);
+  });
+
+  it('aceita sugestão sem clip_category (backwards compat)', () => {
+    expect(validateSuggestion(lolBase, 7200, 'lol-esports')).toBe(true);
+  });
+});
+
+describe('processAnalysis — lol-esports clip_category serialization', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('prefixa reason com [CATEGORY: X] quando clip_category presente', async () => {
+    const mockSuggestions = [
+      { start_time: 0, end_time: 300, title: 'Faker Penta', reason: 'Epic penta', clip_category: 'highlight', type: 'video' },
+    ];
+
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'transcribed', duration_seconds: 3600, content_type: 'lol-esports' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 1, job_id: 1, text: 'texto', words: '[]' }] })
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE analyzing
+      .mockResolvedValueOnce({ rows: [] }) // INSERT
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE analyzed
+
+    analyzeTranscription.mockResolvedValueOnce(mockSuggestions);
+
+    await processAnalysis(1);
+
+    const insertCall = query.mock.calls[3];
+    expect(insertCall[1][4]).toBe('[CATEGORY: highlight] Epic penta');
+  });
+
+  it('não altera reason quando clip_category ausente', async () => {
+    const mockSuggestions = [
+      { start_time: 0, end_time: 300, title: 'Clip genérico', reason: 'Motivo normal', type: 'video' },
+    ];
+
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'transcribed', duration_seconds: 3600, content_type: 'lol-esports' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 1, job_id: 1, text: 'texto', words: '[]' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    analyzeTranscription.mockResolvedValueOnce(mockSuggestions);
+
+    await processAnalysis(1);
+
+    const insertCall = query.mock.calls[3];
+    expect(insertCall[1][4]).toBe('Motivo normal');
   });
 });
 

@@ -1,7 +1,63 @@
 const OpenAI = require('openai');
 const logger = require('../../utils/logger').child({ module: 'openai' });
 
-const SYSTEM_PROMPT = `Você é um especialista em criação de conteúdo para YouTube focado em política brasileira.
+const VALID_CLIP_CATEGORIES = ['highlight', 'educational', 'funny'];
+
+const PROMPTS = {
+  'lol-esports': `Você é um especialista em criação de conteúdo viral para YouTube focado em League of Legends e-sports.
+Seu trabalho é analisar transcrições de narrações de casters de partidas profissionais (LCK, LEC, LCS, CBLOL, Worlds) e identificar os melhores momentos para cortes.
+
+SINAL PRIMÁRIO: Picos de excitação dos casters são o indicador mais confiável de momento importante.
+Detecte expressões como: "OH MY GOD", "PENTAKILL", "THE BARON STEAL", "WHAT A PLAY", "INCREDIBLE", "INSANE", "OH WOW", "FAKER", "THE PLAY", "TEAMFIGHT", "ACE", "CLUTCH", variações em português/coreano legendado, e qualquer aumento de intensidade vocal.
+
+CATEGORIAS DE CLIPES:
+- "highlight": pentakills, teamfights decisivos, baron/dragon steals, outplays individuais, clutch plays, aces, nexus rushes
+- "educational": demonstrações de mecânica de campeão, rotações táticas, wave management, jungle pathing, posicionamento
+- "funny": tilt visível de jogadores, plays completamente inesperados, interações engraçadas entre casters, misplays épicos, reações exageradas
+
+REGRAS PARA "video" (clipes longos horizontais):
+- Sugira 5 a 8 clipes do tipo "video" (formato horizontal 16:9, MÍNIMO 3 minutos e MÁXIMO 10 minutos cada)
+- Inclua contexto antes do momento + o momento + a resolução — não corte no meio de um teamfight
+- Priorize: teamfights completos, sequências de objetivos, momentos que mudaram o jogo
+- Título no padrão e-sports: "Faker Azir Pentakill — LCK Spring 2025" ou "T1 Baron Steal com 20% HP" (máx 70 caracteres)
+
+REGRAS PARA "reel" (shorts/reels verticais):
+- Sugira 5 a 8 clipes do tipo "reel" (formato vertical 9:16, MÍNIMO 30 segundos e MÁXIMO 90 segundos cada)
+- O reel deve ser auto-contido — o momento específico sem contexto extenso
+- Priorize: o instante exato do pentakill/steal/outplay + reação dos casters
+- Título direto: "Faker PENTA 🔥", "Baron Steal INSANO", "O Outplay do Século" (máx 70 caracteres)
+
+FORMATO DE RESPOSTA (JSON obrigatório):
+{
+  "suggestions": [
+    {
+      "start_time": 1245.0,
+      "end_time": 1820.0,
+      "title": "Faker Azir Pentakill — LCK Spring 2025",
+      "reason": "Casters explodiram com OH MY GOD PENTAKILL — sequência épica de teamfight com 5 kills em 8 segundos",
+      "clip_category": "highlight",
+      "type": "video"
+    },
+    {
+      "start_time": 1380.0,
+      "end_time": 1435.0,
+      "title": "Faker PENTA",
+      "reason": "O instante exato do pentakill com reação máxima dos casters — auto-contido e viral",
+      "clip_category": "highlight",
+      "type": "reel"
+    },
+    {
+      "start_time": 2100.0,
+      "end_time": 2280.0,
+      "title": "Como T1 Fez o Baron Steal Perfeito",
+      "reason": "Caster explica o jungle smite timing enquanto acontece — ótimo conteúdo educacional",
+      "clip_category": "educational",
+      "type": "reel"
+    }
+  ]
+}`,
+
+  mbl: `Você é um especialista em criação de conteúdo para YouTube focado em política brasileira.
 Seu trabalho é analisar transcrições de vídeos do MBL (Movimento Brasil Livre) e identificar os melhores momentos para cortes virais.
 
 REGRAS:
@@ -29,7 +85,92 @@ FORMATO DE RESPOSTA (JSON obrigatório):
       "type": "reel"
     }
   ]
-}`;
+}`,
+
+  toguro: `Você é um especialista em criação de conteúdo viral para YouTube focado no streamer/youtuber Toguro.
+Seu trabalho é analisar transcrições de lives e vídeos do Toguro e identificar os melhores momentos para cortes virais.
+
+REGRAS PARA "video" (clipes longos horizontais):
+- Sugira 5 a 10 clipes do tipo "video" (formato horizontal 16:9, MÍNIMO 3 minutos e MÁXIMO 12 minutos cada)
+- Priorize: melhores momentos de live, histórias engraçadas, discussões quentes, highlights de gameplay épicos, reações intensas
+- Cada clipe deve ter começo, meio e fim — não corte no meio de uma situação
+- Título chamativo estilo YouTube (máx 70 caracteres)
+
+REGRAS PARA "reel" (shorts/reels verticais):
+- Sugira 5 a 10 clipes do tipo "reel" (formato vertical 9:16, MÍNIMO 30 segundos e MÁXIMO 90 segundos cada)
+- Priorize: frases icônicas do Toguro, reações exageradas, punchlines engraçadas, momentos de raiva/alegria intensa, jogadas insanas, interações com a chat
+- O reel deve ser auto-contido — quem assiste entende sem contexto
+
+FORMATO DE RESPOSTA (JSON obrigatório):
+{
+  "suggestions": [
+    {
+      "start_time": 300.0,
+      "end_time": 780.0,
+      "title": "Toguro EXPLODE ao perder partida impossível 😤",
+      "reason": "Sequência épica de rage que gerou memes — envolve chat, gameplay e reação",
+      "type": "video"
+    },
+    {
+      "start_time": 512.0,
+      "end_time": 572.0,
+      "title": "Toguro: 'Isso é IMPOSSÍVEL!' 💀",
+      "reason": "Frase icônica com reação exagerada — perfeita para Shorts viral",
+      "type": "reel"
+    }
+  ]
+}`,
+
+  'batalha-de-rima': `Você é um especialista em criação de conteúdo para YouTube focado em batalhas de rima brasileiras.
+Seu trabalho é analisar transcrições de batalhas de rima e identificar: (1) a batalha completa de cada dupla e (2) os melhores momentos para reels.
+
+REGRAS PARA "video" (batalha completa por dupla):
+- Identifique CADA dupla que batalhou e corte a batalha completa dela (do início ao fim, incluindo todas as rondas)
+- Duração: MÍNIMO 3 minutos e MÁXIMO 20 minutos por dupla
+- Formato horizontal (16:9)
+- Título: "Nome do MC1 vs Nome do MC2 | Nome do Evento" (máx 70 caracteres)
+- IMPORTANTE: cubra TODAS as duplas do vídeo, não apenas as melhores
+
+REGRAS PARA "reel" (melhores momentos):
+- Extraia os melhores punchlines, trocas quentes e reações da plateia
+- Duração: MÍNIMO 30 segundos e MÁXIMO 90 segundos cada
+- Formato vertical (9:16) — ideal para Instagram Reels e YouTube Shorts
+- Priorize: punchlines que geraram reação, trocas diretas entre os MCs, momentos de virada
+- Sugira 1 a 3 reels por dupla
+
+FORMATO DE RESPOSTA (JSON obrigatório):
+{
+  "suggestions": [
+    {
+      "start_time": 60.0,
+      "end_time": 780.0,
+      "title": "MC Alpha vs MC Beta | Batalha do Conhecimento",
+      "reason": "Batalha completa da dupla — 3 rondas intensas com reação forte da plateia",
+      "type": "video"
+    },
+    {
+      "start_time": 320.0,
+      "end_time": 395.0,
+      "title": "MC Alpha DESTRUIU com esse punchline 🔥",
+      "reason": "Punchline que parou a batalha — plateia explodiu, adversário sem resposta",
+      "type": "reel"
+    }
+  ]
+}`,
+};
+
+function getSystemPrompt(contentType) {
+  if (process.env.ANALYSIS_PROMPT_TEMPLATE) {
+    return process.env.ANALYSIS_PROMPT_TEMPLATE;
+  }
+  const ct = contentType || process.env.CONTENT_TYPE || 'mbl';
+  const prompt = PROMPTS[ct];
+  if (!prompt) {
+    logger.warn({ content_type: ct }, `content_type desconhecido — usando prompt padrão (mbl)`);
+    return PROMPTS.mbl;
+  }
+  return prompt;
+}
 
 /**
  * Formata a transcrição para envio ao GPT
@@ -129,7 +270,7 @@ function deduplicateSuggestions(suggestions) {
 /**
  * Analisa transcrição e retorna sugestões de cortes
  */
-async function analyzeTranscription(transcriptionText, words, durationSeconds) {
+async function analyzeTranscription(transcriptionText, words, durationSeconds, contentType) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY não configurada');
   }
@@ -141,14 +282,14 @@ async function analyzeTranscription(transcriptionText, words, durationSeconds) {
 
   for (const chunk of chunks) {
     const userPrompt = formatTranscriptionForPrompt(chunk.text, chunk.words, durationSeconds);
-    const promptTemplate = process.env.ANALYSIS_PROMPT_TEMPLATE || null;
+    const systemPrompt = getSystemPrompt(contentType);
 
     const response = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.3,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: promptTemplate || SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
     });
@@ -177,4 +318,4 @@ async function analyzeTranscription(transcriptionText, words, durationSeconds) {
   return deduplicateSuggestions(allSuggestions);
 }
 
-module.exports = { analyzeTranscription, estimateTokens };
+module.exports = { analyzeTranscription, estimateTokens, VALID_CLIP_CATEGORIES };
