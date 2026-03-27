@@ -2,6 +2,8 @@ const { query } = require('../../db/connection');
 const { analyzeTranscription, VALID_CLIP_CATEGORIES } = require('./openai.service');
 const logger = require('../../utils/logger').child({ module: 'analyzer' });
 
+const CATEGORY_PREFIX_RE = /^\[CATEGORY:\s*(highlight|educational|funny)\]\s*/;
+
 const LIMITS_BY_CONTENT_TYPE = {
   mbl:               { minReel: 45, maxReel: 60,  minVideo: 300,  maxVideo: 600  },
   'batalha-de-rima': { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 1200 },
@@ -77,13 +79,10 @@ async function processAnalysis(jobId) {
 
     // 6. Salva no banco
     for (const s of validSuggestions) {
-      const reason = s.clip_category
-        ? `[CATEGORY: ${s.clip_category}] ${s.reason}`
-        : s.reason;
       await query(
-        `INSERT INTO clip_suggestions (job_id, start_time, end_time, title, reason, type, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
-        [jobId, s.start_time, s.end_time, s.title.substring(0, 100), reason, s.type]
+        `INSERT INTO clip_suggestions (job_id, start_time, end_time, title, reason, type, clip_category, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
+        [jobId, s.start_time, s.end_time, s.title.substring(0, 100), s.reason, s.type, s.clip_category || null]
       );
     }
 
@@ -134,4 +133,32 @@ async function updateSuggestionStatus(suggestionId, status) {
   return result.rows[0];
 }
 
-module.exports = { processAnalysis, getSuggestions, updateSuggestionStatus, validateSuggestion };
+/**
+ * Migra sugestões legadas que têm [CATEGORY: X] no campo reason
+ * para a coluna dedicada clip_category, limpando o prefixo de reason.
+ */
+async function backfillClipCategory() {
+  const result = await query(
+    `SELECT id, reason FROM clip_suggestions WHERE reason LIKE '[CATEGORY:%'`
+  );
+
+  let updated = 0;
+  for (const row of result.rows) {
+    const match = row.reason.match(CATEGORY_PREFIX_RE);
+    if (!match) continue;
+
+    const category = match[1];
+    const cleanReason = row.reason.replace(CATEGORY_PREFIX_RE, '');
+
+    await query(
+      'UPDATE clip_suggestions SET clip_category=$1, reason=$2 WHERE id=$3',
+      [category, cleanReason, row.id]
+    );
+    updated++;
+  }
+
+  logger.info({ updated }, 'Backfill clip_category concluído');
+  return updated;
+}
+
+module.exports = { processAnalysis, getSuggestions, updateSuggestionStatus, validateSuggestion, backfillClipCategory };

@@ -83,6 +83,9 @@ const migrations = [
   `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS failure_reason TEXT`,
 
+  // content_type por job (batalha-de-rima, toguro, mbl)
+  `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS content_type TEXT NOT NULL DEFAULT 'mbl'`,
+
   // Story 5.6: indexes de performance
   // PostgreSQL não cria indexes automaticamente para FKs
   `CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)`,
@@ -95,6 +98,9 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_clips_status ON clips(status)`,
   `CREATE INDEX IF NOT EXISTS idx_uploads_clip_id ON uploads(clip_id)`,
   `CREATE INDEX IF NOT EXISTS idx_uploads_status ON uploads(status)`,
+
+  // Story 6.2: adicionar clip_category à tabela clip_suggestions (idempotente)
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS clip_category TEXT`,
 ];
 
 async function migrate() {

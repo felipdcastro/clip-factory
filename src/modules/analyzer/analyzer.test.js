@@ -11,7 +11,7 @@ jest.mock('./openai.service', () => ({
 
 const { query } = require('../../db/connection');
 const { analyzeTranscription } = require('./openai.service');
-const { processAnalysis, updateSuggestionStatus, validateSuggestion } = require('./analyzer.service');
+const { processAnalysis, updateSuggestionStatus, validateSuggestion, backfillClipCategory } = require('./analyzer.service');
 
 describe('validateSuggestion', () => {
   // video requer duração entre 5-10 min (300-600s); reel entre 45-60s
@@ -85,10 +85,10 @@ describe('validateSuggestion — lol-esports', () => {
   });
 });
 
-describe('processAnalysis — lol-esports clip_category serialization', () => {
+describe('processAnalysis — lol-esports clip_category column (Story 6.2)', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('prefixa reason com [CATEGORY: X] quando clip_category presente', async () => {
+  it('salva clip_category na coluna dedicada ($7) sem prefixo em reason', async () => {
     const mockSuggestions = [
       { start_time: 0, end_time: 300, title: 'Faker Penta', reason: 'Epic penta', clip_category: 'highlight', type: 'video' },
     ];
@@ -105,10 +105,11 @@ describe('processAnalysis — lol-esports clip_category serialization', () => {
     await processAnalysis(1);
 
     const insertCall = query.mock.calls[3];
-    expect(insertCall[1][4]).toBe('[CATEGORY: highlight] Epic penta');
+    expect(insertCall[1][4]).toBe('Epic penta');      // reason sem prefixo
+    expect(insertCall[1][6]).toBe('highlight');        // clip_category na posição $7
   });
 
-  it('não altera reason quando clip_category ausente', async () => {
+  it('passa null para clip_category quando ausente', async () => {
     const mockSuggestions = [
       { start_time: 0, end_time: 300, title: 'Clip genérico', reason: 'Motivo normal', type: 'video' },
     ];
@@ -125,7 +126,45 @@ describe('processAnalysis — lol-esports clip_category serialization', () => {
     await processAnalysis(1);
 
     const insertCall = query.mock.calls[3];
-    expect(insertCall[1][4]).toBe('Motivo normal');
+    expect(insertCall[1][4]).toBe('Motivo normal');   // reason inalterado
+    expect(insertCall[1][6]).toBeNull();               // clip_category null
+  });
+});
+
+describe('backfillClipCategory', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('extrai categoria e limpa prefixo do reason', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [
+        { id: 1, reason: '[CATEGORY: highlight] Faker penta épico' },
+        { id: 2, reason: '[CATEGORY: funny] Caster tilted' },
+      ]})
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE id=1
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE id=2
+
+    const updated = await backfillClipCategory();
+
+    expect(updated).toBe(2);
+    expect(query.mock.calls[1][1]).toEqual(['highlight', 'Faker penta épico', 1]);
+    expect(query.mock.calls[2][1]).toEqual(['funny', 'Caster tilted', 2]);
+  });
+
+  it('não modifica linhas sem prefixo [CATEGORY:]', async () => {
+    query.mockResolvedValueOnce({ rows: [
+      { id: 3, reason: 'Reason sem prefixo' },
+    ]});
+
+    const updated = await backfillClipCategory();
+
+    expect(updated).toBe(0);
+    expect(query).toHaveBeenCalledTimes(1); // apenas o SELECT
+  });
+
+  it('retorna 0 quando não há linhas com prefixo', async () => {
+    query.mockResolvedValueOnce({ rows: [] });
+    const updated = await backfillClipCategory();
+    expect(updated).toBe(0);
   });
 });
 
