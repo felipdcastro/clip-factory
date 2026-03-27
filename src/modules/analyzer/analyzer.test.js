@@ -11,7 +11,7 @@ jest.mock('./openai.service', () => ({
 
 const { query } = require('../../db/connection');
 const { analyzeTranscription } = require('./openai.service');
-const { processAnalysis, updateSuggestionStatus, validateSuggestion, backfillClipCategory } = require('./analyzer.service');
+const { processAnalysis, updateSuggestionStatus, validateSuggestion, backfillClipCategory, getSuggestions } = require('./analyzer.service');
 
 describe('validateSuggestion', () => {
   // video requer duração entre 5-10 min (300-600s); reel entre 45-60s
@@ -203,6 +203,34 @@ describe('processAnalysis', () => {
     expect(result).toHaveLength(2);
     expect(result[0].type).toBe('video');
     expect(result[1].type).toBe('reel');
+  });
+});
+
+describe('getSuggestions — filtro por categoria (Story 6.3)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('sem category retorna todas as sugestões (comportamento atual)', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 1 }, { id: 2 }] });
+    const result = await getSuggestions(42);
+    expect(result).toHaveLength(2);
+    const callArgs = query.mock.calls[0];
+    expect(callArgs[1]).toEqual([42]);
+    expect(callArgs[0]).not.toContain('clip_category');
+  });
+
+  it('com category passa $2 na query e filtra por clip_category', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 3, clip_category: 'highlight' }] });
+    const result = await getSuggestions(42, 'highlight');
+    expect(result).toHaveLength(1);
+    const callArgs = query.mock.calls[0];
+    expect(callArgs[1]).toEqual([42, 'highlight']);
+    expect(callArgs[0]).toContain('clip_category=$2');
+  });
+
+  it('com category educational filtra corretamente', async () => {
+    query.mockResolvedValueOnce({ rows: [] });
+    await getSuggestions(1, 'educational');
+    expect(query.mock.calls[0][1]).toEqual([1, 'educational']);
   });
 });
 

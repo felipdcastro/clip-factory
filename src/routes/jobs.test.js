@@ -122,4 +122,18 @@ describe('Job service — testes de unidade', () => {
     expect(result).toHaveLength(2);
     expect(result[0].type).toBe('video');
   });
+
+  it('getSuggestions com category retorna subset filtrado', async () => {
+    getSuggestions.mockResolvedValue([{ id: 3, clip_category: 'funny', type: 'reel' }]);
+    const result = await getSuggestions(1, 'funny');
+    expect(result).toHaveLength(1);
+    expect(getSuggestions).toHaveBeenCalledWith(1, 'funny');
+  });
+
+  it('getSuggestions sem category retorna todas', async () => {
+    getSuggestions.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    const result = await getSuggestions(1, undefined);
+    expect(result).toHaveLength(3);
+    expect(getSuggestions).toHaveBeenCalledWith(1, undefined);
+  });
 });

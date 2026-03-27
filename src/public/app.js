@@ -4,8 +4,26 @@
 
 // ── Estado ────────────────────────────────────────────────────────────────
 let currentJobId = null;
+let currentJob = null;
 let jobPollInterval = null;
 let transcriptionWords = [];
+let selectedContentType = 'batalha-de-rima';
+
+// Paleta de cores por clip_category (LoL)
+const CATEGORY_COLORS = {
+  highlight:   { bg: '#C89B3C', text: '#1a1a1a' },
+  educational: { bg: '#0BC4E3', text: '#1a1a1a' },
+  funny:       { bg: '#1E9E5E', text: '#fff' },
+};
+
+// ── Seletor de content type ───────────────────────────────────────────────
+document.querySelectorAll('.btn-content-type').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.btn-content-type').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedContentType = btn.dataset.type;
+  });
+});
 
 // ── Utilitários ───────────────────────────────────────────────────────────
 
@@ -93,6 +111,7 @@ async function pollJob(jobId) {
 
   if (job.status === 'analyzed') {
     stopPolling();
+    currentJob = job;
     await loadSuggestions(jobId);
     return;
   }
@@ -123,31 +142,61 @@ function getTranscriptSnippet(startTime, endTime) {
   return words.length > 200 ? words.substring(0, 200) + '…' : words;
 }
 
-async function loadSuggestions(jobId) {
-  // Carrega transcrição para preview
-  const tx = await api('GET', `/api/jobs/${jobId}/transcription`);
-  if (tx && Array.isArray(tx.words)) transcriptionWords = tx.words;
+async function loadSuggestions(jobId, category) {
+  // Carrega transcrição para preview (apenas na primeira carga, sem filtro)
+  if (!category) {
+    const tx = await api('GET', `/api/jobs/${jobId}/transcription`);
+    if (tx && Array.isArray(tx.words)) transcriptionWords = tx.words;
+  }
 
-  const data = await api('GET', `/api/jobs/${jobId}/suggestions`);
+  const url = category
+    ? `/api/jobs/${jobId}/suggestions?category=${encodeURIComponent(category)}`
+    : `/api/jobs/${jobId}/suggestions`;
+  const data = await api('GET', url);
   if (!data || !data.suggestions) return;
 
   const section = document.getElementById('suggestions-section');
   const list = document.getElementById('suggestions-list');
   const title = document.getElementById('suggestions-title');
+  const filtersEl = document.getElementById('category-filters');
 
   const { suggestions } = data;
   const videos = suggestions.filter(s => s.type === 'video').length;
   const reels  = suggestions.filter(s => s.type === 'reel').length;
   title.textContent = `${suggestions.length} sugestões — ${videos} vídeos, ${reels} reels`;
 
+  // Filtros de categoria (apenas lol-esports)
+  if (filtersEl) {
+    if (currentJob && currentJob.content_type === 'lol-esports') {
+      filtersEl.innerHTML = renderCategoryFilters(jobId, category);
+      filtersEl.style.display = 'flex';
+    } else {
+      filtersEl.style.display = 'none';
+    }
+  }
+
   list.innerHTML = '';
   if (!suggestions.length) {
-    list.innerHTML = '<div class="empty-state">Nenhuma sugestão gerada.</div>';
+    list.innerHTML = '<div class="empty-state">Nenhuma sugestão para esta categoria.</div>';
   } else {
     suggestions.forEach(s => list.appendChild(buildSuggestionCard(s)));
   }
 
   section.style.display = 'block';
+}
+
+function renderCategoryFilters(jobId, activeCategory) {
+  const categories = [
+    { value: '', label: 'Todos' },
+    { value: 'highlight', label: 'Highlight' },
+    { value: 'educational', label: 'Educational' },
+    { value: 'funny', label: 'Funny' },
+  ];
+  return categories.map(({ value, label }) => {
+    const isActive = (activeCategory || '') === value;
+    const onclickArg = value ? `'${value}'` : 'undefined';
+    return `<button class="btn-category-filter${isActive ? ' active' : ''}" onclick="loadSuggestions(${jobId}, ${onclickArg})">${label}</button>`;
+  }).join('');
 }
 
 function buildSuggestionCard(s) {
@@ -157,10 +206,14 @@ function buildSuggestionCard(s) {
 
   const snippet = getTranscriptSnippet(s.start_time, s.end_time);
   const isDecided = s.status === 'approved' || s.status === 'rejected';
+  const catColors = s.clip_category && CATEGORY_COLORS[s.clip_category];
+  const categoryBadge = catColors
+    ? `<span class="category-badge" style="background:${catColors.bg};color:${catColors.text}">${esc(s.clip_category)}</span>`
+    : '';
 
   card.innerHTML = `
     <div class="card-header">
-      <div class="card-title">${esc(s.title)}</div>
+      <div class="card-title">${esc(s.title)}${categoryBadge}</div>
       <div class="card-meta">
         <span class="badge badge-${s.type}">${s.type === 'video' ? 'VÍDEO' : 'REEL'}</span>
         <span class="timestamps">${fmt(s.start_time)} → ${fmt(s.end_time)} (${dur(s.start_time, s.end_time)})</span>
@@ -337,6 +390,7 @@ async function uploadFileInChunks(file, progressEl) {
     formData.append('chunkIndex', i);
     formData.append('totalChunks', totalChunks);
     formData.append('fileName', file.name);
+    formData.append('content_type', selectedContentType);
 
     const pct = Math.round(((i + 1) / totalChunks) * 100);
     progressEl.textContent = `Enviando... ${pct}% (parte ${i + 1}/${totalChunks})`;
@@ -353,9 +407,37 @@ async function uploadFileInChunks(file, progressEl) {
   return null;
 }
 
+// ── Upload zone drag-and-drop ──────────────────────────────────────────────
+const uploadZone = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('file-input');
+const uploadBtn  = document.getElementById('upload-btn');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) {
+    const f = fileInput.files[0];
+    uploadZone.querySelector('.upload-zone-label').textContent = f.name;
+    uploadZone.querySelector('.upload-zone-hint').textContent = `${(f.size/1024/1024).toFixed(1)} MB`;
+    uploadZone.querySelector('.upload-zone-icon').textContent = '🎬';
+    uploadBtn.style.display = 'flex';
+  }
+});
+
+uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const fileInput = document.getElementById('file-input');
   const progressEl = document.getElementById('upload-progress');
   const btn = document.getElementById('upload-btn');
 
@@ -364,7 +446,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   const file = fileInput.files[0];
   btn.disabled = true;
   progressEl.style.display = 'block';
-  progressEl.textContent = `Iniciando envio de ${file.name} (${(file.size / 1024 / 1024).toFixed(0)} MB)...`;
+  progressEl.textContent = `⏳ Iniciando envio de ${file.name} (${(file.size / 1024 / 1024).toFixed(0)} MB)...`;
 
   stopPolling();
   transcriptionWords = [];
@@ -380,7 +462,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
       return;
     }
 
-    progressEl.textContent = `✓ Arquivo recebido! Iniciando transcrição...`;
+    progressEl.textContent = `✅ Arquivo recebido! Iniciando transcrição...`;
     currentJobId = job.id;
     updateProgress('downloaded');
     startPolling(job.id);
@@ -389,6 +471,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   } finally {
     btn.disabled = false;
     fileInput.value = '';
+    uploadZone.querySelector('.upload-zone-label').textContent = 'Clique ou arraste o vídeo aqui';
+    uploadZone.querySelector('.upload-zone-hint').textContent = 'MP4, MKV, AVI, MOV, WEBM';
+    uploadZone.querySelector('.upload-zone-icon').textContent = '📁';
+    uploadBtn.style.display = 'none';
   }
 });
 
@@ -397,14 +483,14 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 // ── Jobs recentes ──────────────────────────────────────────────────────────
 
 const STATUS_BADGE = {
-  pending:      { label: 'Pendente',     color: '#888' },
-  downloading:  { label: 'Baixando',     color: '#f5a623' },
-  downloaded:   { label: 'Baixado',      color: '#f5a623' },
-  transcribing: { label: 'Transcrevendo',color: '#f5a623' },
-  transcribed:  { label: 'Transcrito',   color: '#f5a623' },
-  analyzing:    { label: 'Analisando',   color: '#f5a623' },
-  analyzed:     { label: '✓ Pronto',     color: '#27ae60' },
-  failed:       { label: '✗ Falhou',     color: '#e74c3c' },
+  pending:      { label: 'Pendente',      bg: 'rgba(120,120,120,0.15)', color: '#888' },
+  downloading:  { label: 'Baixando',      bg: 'rgba(201,162,39,0.12)',  color: '#c9a227' },
+  downloaded:   { label: 'Baixado',       bg: 'rgba(201,162,39,0.12)',  color: '#c9a227' },
+  transcribing: { label: 'Transcrevendo', bg: 'rgba(201,162,39,0.12)',  color: '#c9a227' },
+  transcribed:  { label: 'Transcrito',    bg: 'rgba(201,162,39,0.12)',  color: '#c9a227' },
+  analyzing:    { label: 'Analisando',    bg: 'rgba(201,162,39,0.12)',  color: '#c9a227' },
+  analyzed:     { label: '✓ Pronto',      bg: 'rgba(34,197,94,0.12)',   color: '#4ade80' },
+  failed:       { label: '✗ Falhou',      bg: 'rgba(239,68,68,0.12)',   color: '#f87171' },
 };
 
 async function loadRecentJobs() {
@@ -415,17 +501,21 @@ async function loadRecentJobs() {
   list.innerHTML = '';
 
   jobs.slice(0, 10).forEach(job => {
-    const badge = STATUS_BADGE[job.status] || { label: job.status, color: '#888' };
+    const badge = STATUS_BADGE[job.status] || { label: job.status, bg: 'rgba(120,120,120,0.15)', color: '#888' };
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;background:#1a1a1a;border-radius:6px;margin-bottom:6px;cursor:pointer;border:1px solid #2a2a2a';
+    row.className = 'job-row';
+    const ctIcons = { 'batalha-de-rima': '🎤', toguro: '🎮', mbl: '🏛️' };
+    const ctIcon = ctIcons[job.content_type] || '🎬';
     row.innerHTML = `
-      <span style="background:${badge.color};color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:10px;white-space:nowrap">${badge.label}</span>
-      <span style="flex:1;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(job.title || job.url)}</span>
-      <span style="font-size:0.75rem;color:#666">#${job.id}</span>
+      <span class="job-status-badge" style="background:${badge.bg};color:${badge.color};border:1px solid ${badge.color}33">${badge.label}</span>
+      <span style="font-size:14px">${ctIcon}</span>
+      <span class="job-title">${esc(job.title || job.url)}</span>
+      <span class="job-id">#${job.id}</span>
     `;
     if (job.status === 'analyzed') {
       row.addEventListener('click', () => {
         currentJobId = job.id;
+        currentJob = job;
         document.getElementById('suggestions-section').style.display = 'none';
         loadSuggestions(job.id);
         updateProgress(job.status);
@@ -463,7 +553,7 @@ document.getElementById('url-form').addEventListener('submit', async (e) => {
   document.getElementById('suggestions-list').innerHTML = '';
   updateProgress('pending');
 
-  const job = await api('POST', '/api/jobs', { url });
+  const job = await api('POST', '/api/jobs', { url, content_type: selectedContentType });
   if (!job || job.error) {
     document.getElementById('status-text').textContent = job?.error || 'Erro ao criar job';
     btn.disabled = false;

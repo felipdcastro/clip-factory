@@ -7,64 +7,115 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+
+  <!-- Header -->
   <header>
-    <h1>🎬 Clip Factory</h1>
-    <div class="user-info">
-      <form action="/auth/logout" method="POST" style="display:inline">
-        <button type="submit" class="logout-btn">Sair</button>
-      </form>
+    <div class="header-brand">
+      <div class="header-logo">✂️</div>
+      <span class="header-title">Clip <span>Factory</span></span>
     </div>
+    <form action="/auth/logout" method="POST">
+      <button type="submit" class="logout-btn">Sair</button>
+    </form>
+    <div class="header-gold-line"></div>
   </header>
 
   <main>
-    <!-- URL Form -->
-    <form id="url-form" class="url-form">
-      <input
-        type="url"
-        id="url-input"
-        placeholder="Cole a URL do YouTube aqui..."
-        autocomplete="off"
-      >
-      <button type="submit" class="btn btn-primary" id="submit-btn">Processar URL</button>
-    </form>
 
-    <!-- Upload Form -->
-    <form id="upload-form" class="url-form" style="margin-top:10px">
-      <input
-        type="file"
-        id="file-input"
-        accept=".mp4,.mkv,.avi,.mov,.webm"
-        style="flex:1;padding:10px;background:#1e1e1e;border:1px solid #333;border-radius:6px;color:#fff"
-      >
-      <button type="submit" class="btn btn-primary" id="upload-btn">Enviar Vídeo</button>
-    </form>
-    <div id="upload-progress" style="display:none;margin-top:8px;font-size:0.85rem;color:#aaa"></div>
+    <!-- Painel de novo job -->
+    <div class="panel mb-20">
+      <div class="panel-header">
+        <div class="panel-icon">＋</div>
+        <span class="panel-title">Novo Job</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- Seletor de tipo de conteúdo -->
+        <div class="content-type-wrapper">
+          <div class="content-type-label">Tipo de conteúdo</div>
+          <div class="content-type-tabs" id="content-type-selector">
+            <button class="btn-content-type active" data-type="batalha-de-rima">
+              <span class="ct-icon">🎤</span> Batalha de Rima
+            </button>
+            <button class="btn-content-type" data-type="toguro">
+              <span class="ct-icon">🎮</span> Toguro
+            </button>
+            <button class="btn-content-type" data-type="mbl">
+              <span class="ct-icon">🏛️</span> MBL / Política
+            </button>
+          </div>
+        </div>
+
+        <!-- URL do YouTube -->
+        <form id="url-form">
+          <div class="input-row">
+            <input
+              type="url"
+              id="url-input"
+              placeholder="Cole a URL do YouTube aqui..."
+              autocomplete="off"
+            >
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+              ▶ Processar URL
+            </button>
+          </div>
+        </form>
+
+        <div class="divider">ou envie um arquivo</div>
+
+        <!-- Upload de arquivo -->
+        <form id="upload-form">
+          <div class="upload-zone" id="upload-zone">
+            <input type="file" id="file-input" accept=".mp4,.mkv,.avi,.mov,.webm">
+            <div class="upload-zone-icon">📁</div>
+            <div class="upload-zone-label">Clique ou arraste o vídeo aqui</div>
+            <div class="upload-zone-hint">MP4, MKV, AVI, MOV, WEBM</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="upload-btn" style="display:none">
+            ↑ Enviar Vídeo
+          </button>
+        </form>
+        <div id="upload-progress"></div>
+
+      </div>
+    </div>
 
     <!-- Status Bar -->
-    <div id="status-bar" class="status-bar">
-      <div id="status-text" style="font-size:0.9rem;color:#aaa;margin-bottom:6px"></div>
+    <div id="status-bar" class="status-bar panel mb-20">
+      <div class="status-label">Processamento</div>
+      <div id="status-text" class="status-message"></div>
       <div class="progress-steps">
-        <span class="step" id="step-downloading">Baixando</span>
+        <span class="step" id="step-downloading">
+          <span class="dot"></span> Baixando
+        </span>
         <span class="step-arrow">›</span>
-        <span class="step" id="step-transcribing">Transcrevendo</span>
+        <span class="step" id="step-transcribing">
+          <span class="dot"></span> Transcrevendo
+        </span>
         <span class="step-arrow">›</span>
-        <span class="step" id="step-analyzing">Analisando</span>
+        <span class="step" id="step-analyzing">
+          <span class="dot"></span> Analisando
+        </span>
         <span class="step-arrow">›</span>
-        <span class="step" id="step-analyzed">Pronto</span>
+        <span class="step" id="step-analyzed">
+          <span class="dot"></span> Pronto
+        </span>
       </div>
     </div>
 
     <!-- Jobs Recentes -->
-    <div id="jobs-section" style="margin-top:20px">
-      <div class="section-title" style="margin-bottom:8px">Jobs recentes</div>
+    <div id="jobs-section" class="mb-20">
+      <div class="section-title">Jobs recentes</div>
       <div id="jobs-list"></div>
     </div>
 
-    <!-- Suggestions Section -->
+    <!-- Sugestões de corte -->
     <div id="suggestions-section" style="display:none">
       <div class="section-title" id="suggestions-title">Sugestões de corte</div>
+      <div id="category-filters" class="category-filters" style="display:none"></div>
       <div id="suggestions-list" class="suggestions-list"></div>
     </div>
+
   </main>
 
   <script src="/app.js"></script>

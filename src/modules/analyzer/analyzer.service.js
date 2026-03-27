@@ -103,14 +103,18 @@ async function processAnalysis(jobId) {
   }
 }
 
-async function getSuggestions(jobId) {
+async function getSuggestions(jobId, category) {
+  const params = [jobId];
+  const categoryClause = category ? ' AND cs.clip_category=$2' : '';
+  if (category) params.push(category);
+
   const result = await query(
     `SELECT cs.*, c.id as clip_id, c.status as clip_status
      FROM clip_suggestions cs
      LEFT JOIN clips c ON c.suggestion_id = cs.id
-     WHERE cs.job_id=$1
+     WHERE cs.job_id=$1${categoryClause}
      ORDER BY cs.start_time ASC`,
-    [jobId]
+    params
   );
   return result.rows;
 }

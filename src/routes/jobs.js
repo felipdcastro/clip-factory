@@ -54,12 +54,12 @@ const chunkUpload = multer({
 // POST /api/jobs — cria job e inicia download em background
 router.post('/', jobCreateLimiter, async (req, res, next) => {
   try {
-    const { url } = req.body;
+    const { url, content_type } = req.body;
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'Campo "url" é obrigatório' });
     }
 
-    const job = await createJob(url.trim());
+    const job = await createJob(url.trim(), content_type);
     res.status(201).json(job);
   } catch (err) {
     if (err.status === 400) return res.status(400).json({ error: err.message });
@@ -73,7 +73,7 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({ error: 'Arquivo de vídeo é obrigatório' });
     }
-    const job = await createJobFromFile(req.file.path, req.file.originalname);
+    const job = await createJobFromFile(req.file.path, req.file.originalname, req.body.content_type);
     res.status(201).json(job);
   } catch (err) {
     next(err);
@@ -84,7 +84,7 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
 router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next) => {
   const multerFilePath = req.file?.path;
   try {
-    const { uploadId, chunkIndex, totalChunks, fileName } = req.body;
+    const { uploadId, chunkIndex, totalChunks, fileName, content_type } = req.body;
     if (!req.file || !uploadId || chunkIndex === undefined || !totalChunks || !fileName) {
       return res.status(400).json({ error: 'Dados do chunk inválidos' });
     }
@@ -136,7 +136,7 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
         writeStream.on('error', reject);
       });
 
-      const job = await createJobFromFile(finalPath, fileName);
+      const job = await createJobFromFile(finalPath, fileName, content_type);
       res.status(201).json({ job });
     } finally {
       assemblingUploads.delete(uploadId);
@@ -191,12 +191,17 @@ router.get('/:id/transcription', async (req, res, next) => {
 });
 
 // GET /api/jobs/:id/suggestions — lista sugestões de corte
+// Query param opcional: ?category=highlight|educational|funny
+const VALID_SUGGESTION_CATEGORIES = ['highlight', 'educational', 'funny'];
 router.get('/:id/suggestions', async (req, res, next) => {
   try {
     const job = await getJob(req.params.id);
     if (!job) return res.status(404).json({ error: 'Job não encontrado' });
 
-    const suggestions = await getSuggestions(req.params.id);
+    const { category } = req.query;
+    const safeCategory = VALID_SUGGESTION_CATEGORIES.includes(category) ? category : undefined;
+
+    const suggestions = await getSuggestions(req.params.id, safeCategory);
     res.json({ job_status: job.status, suggestions });
   } catch (err) {
     next(err);
