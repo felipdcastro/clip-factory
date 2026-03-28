@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { updateSuggestionStatus } = require('../modules/analyzer/analyzer.service');
+const { generateYouTubeMetadata } = require('../modules/analyzer/metadata.service');
 const { query } = require('../db/connection');
 
 // GET /api/suggestions/:id/clip — retorna o clip associado à sugestão
@@ -11,6 +12,21 @@ router.get('/:id/clip', async (req, res, next) => {
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Clip não encontrado' });
     res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/suggestions/:id/metadata — retorna metadados YouTube gerados
+router.get('/:id/metadata', async (req, res, next) => {
+  try {
+    const result = await query(
+      'SELECT id, title, reason, clip_category, type FROM clip_suggestions WHERE id=$1',
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Sugestão não encontrada' });
+    const metadata = generateYouTubeMetadata(result.rows[0]);
+    res.json(metadata);
   } catch (err) {
     next(err);
   }

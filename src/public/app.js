@@ -203,6 +203,7 @@ function buildSuggestionCard(s) {
   const card = document.createElement('div');
   card.className = `suggestion-card ${s.status}`;
   card.id = `suggestion-${s.id}`;
+  card.dataset.suggestionTitle = s.title;
 
   const snippet = getTranscriptSnippet(s.start_time, s.end_time);
   const isDecided = s.status === 'approved' || s.status === 'rejected';
@@ -298,7 +299,7 @@ async function pollClipStatus(suggestionId, clipId) {
     if (cStatus === 'ready') {
       statusEl.className = 'clip-status ready';
       statusEl.textContent = '✓ Pronto!';
-      actionsEl.appendChild(buildUploadForm({ id: cId }, suggestionId));
+      buildUploadForm({ id: cId }, suggestionId).then(form => actionsEl.appendChild(form));
       return;
     }
 
@@ -313,10 +314,9 @@ async function pollClipStatus(suggestionId, clipId) {
 
 // ── Upload Form ────────────────────────────────────────────────────────────
 
-function buildUploadForm(clip, suggestionId) {
+async function buildUploadForm(clip, suggestionId) {
   const card = document.getElementById(`suggestion-${suggestionId}`);
-  const titleEl = card.querySelector('.card-title');
-  const defaultTitle = titleEl ? titleEl.textContent : '';
+  const defaultTitle = card ? (card.dataset.suggestionTitle || '') : '';
 
   const form = document.createElement('div');
   form.className = 'upload-form';
@@ -341,6 +341,16 @@ function buildUploadForm(clip, suggestionId) {
       onclick="scheduleUpload(${clip.id}, ${suggestionId})">Agendar Upload</button>
     <span class="clip-status" id="upload-status-${suggestionId}"></span>
   `;
+
+  // Pré-preenche título e descrição com metadados gerados
+  const meta = await api('GET', `/api/suggestions/${suggestionId}/metadata`);
+  if (meta && meta.title) {
+    const titleInput = document.getElementById(`upload-title-${suggestionId}`);
+    const descInput  = document.getElementById(`upload-desc-${suggestionId}`);
+    if (titleInput) titleInput.value = meta.title.substring(0, 100);
+    if (descInput)  descInput.value  = meta.description || '';
+  }
+
   return form;
 }
 
