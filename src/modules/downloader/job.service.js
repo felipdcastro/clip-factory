@@ -9,15 +9,18 @@ const TEMP_DIR = process.env.TEMP_DIR || './tmp';
 /**
  * Cria um novo job de download e inicia o processamento em background
  */
-async function createJob(url) {
+const VALID_CONTENT_TYPES = ['mbl', 'batalha-de-rima', 'toguro', 'lol-esports'];
+
+async function createJob(url, contentType = 'mbl', summonerName = null, riotRegion = 'BR1') {
   if (!isValidYouTubeUrl(url)) {
     throw Object.assign(new Error('URL inválida. Informe uma URL do YouTube válida.'), { status: 400 });
   }
+  const ct = VALID_CONTENT_TYPES.includes(contentType) ? contentType : 'mbl';
 
   // Cria o job no banco com status pending
   const result = await query(
-    'INSERT INTO jobs (url, status) VALUES ($1, $2) RETURNING *',
-    [url, 'pending']
+    'INSERT INTO jobs (url, status, content_type, summoner_name, riot_region) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [url, 'pending', ct, summonerName || null, riotRegion || 'BR1']
   );
   const job = result.rows[0];
 
@@ -98,14 +101,15 @@ async function listJobs() {
 /**
  * Cria job a partir de arquivo enviado pelo usuário (sem download)
  */
-async function createJobFromFile(filePath, originalName) {
+async function createJobFromFile(filePath, originalName, contentType = 'mbl', summonerName = null, riotRegion = 'BR1') {
   const title = path.basename(originalName, path.extname(originalName));
   const absolutePath = path.resolve(filePath);
+  const ct = VALID_CONTENT_TYPES.includes(contentType) ? contentType : 'mbl';
 
   const result = await query(
-    `INSERT INTO jobs (url, title, status, file_path, updated_at)
-     VALUES ($1, $2, 'downloaded', $3, NOW()) RETURNING *`,
-    [`file://${originalName}`, title, absolutePath]
+    `INSERT INTO jobs (url, title, status, file_path, content_type, summoner_name, riot_region, updated_at)
+     VALUES ($1, $2, 'downloaded', $3, $4, $5, $6, NOW()) RETURNING *`,
+    [`file://${originalName}`, title, absolutePath, ct, summonerName || null, riotRegion || 'BR1']
   );
 
   const job = result.rows[0];

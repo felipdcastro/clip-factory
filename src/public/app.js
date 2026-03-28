@@ -17,11 +17,17 @@ const CATEGORY_COLORS = {
 };
 
 // ── Seletor de content type ───────────────────────────────────────────────
+function updateSummonerFieldsVisibility() {
+  const el = document.getElementById('summoner-fields');
+  if (el) el.style.display = selectedContentType === 'lol-esports' ? 'block' : 'none';
+}
+
 document.querySelectorAll('.btn-content-type').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.btn-content-type').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     selectedContentType = btn.dataset.type;
+    updateSummonerFieldsVisibility();
   });
 });
 
@@ -395,12 +401,18 @@ async function uploadFileInChunks(file, progressEl) {
     const chunk = file.slice(start, end);
 
     const formData = new FormData();
+    const summonerInput = document.getElementById('summoner-name-input');
+    const regionSelect  = document.getElementById('riot-region-select');
     formData.append('chunk', chunk);
     formData.append('uploadId', uploadId);
     formData.append('chunkIndex', i);
     formData.append('totalChunks', totalChunks);
     formData.append('fileName', file.name);
     formData.append('content_type', selectedContentType);
+    if (summonerInput && summonerInput.value.trim()) {
+      formData.append('summoner_name', summonerInput.value.trim());
+      formData.append('riot_region', regionSelect ? regionSelect.value : 'BR1');
+    }
 
     const pct = Math.round(((i + 1) / totalChunks) * 100);
     progressEl.textContent = `Enviando... ${pct}% (parte ${i + 1}/${totalChunks})`;
@@ -563,7 +575,14 @@ document.getElementById('url-form').addEventListener('submit', async (e) => {
   document.getElementById('suggestions-list').innerHTML = '';
   updateProgress('pending');
 
-  const job = await api('POST', '/api/jobs', { url, content_type: selectedContentType });
+  const summonerInput = document.getElementById('summoner-name-input');
+  const regionSelect  = document.getElementById('riot-region-select');
+  const job = await api('POST', '/api/jobs', {
+    url,
+    content_type: selectedContentType,
+    summoner_name: summonerInput ? (summonerInput.value.trim() || null) : null,
+    riot_region:   regionSelect  ? (regionSelect.value || 'BR1')        : 'BR1',
+  });
   if (!job || job.error) {
     document.getElementById('status-text').textContent = job?.error || 'Erro ao criar job';
     btn.disabled = false;

@@ -101,6 +101,10 @@ const migrations = [
 
   // Story 6.2: adicionar clip_category à tabela clip_suggestions (idempotente)
   `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS clip_category TEXT`,
+
+  // Story 6.5: summoner_name e riot_region na tabela jobs
+  `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS summoner_name TEXT`,
+  `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS riot_region TEXT DEFAULT 'BR1'`,
 ];
 
 async function migrate() {

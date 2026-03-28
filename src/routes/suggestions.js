@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { updateSuggestionStatus } = require('../modules/analyzer/analyzer.service');
 const { generateYouTubeMetadata } = require('../modules/analyzer/metadata.service');
+const { getSummonerByName, getSummonerRank, getRecentMatchChampion } = require('../modules/analyzer/riot.service');
 const { query } = require('../db/connection');
 
 // GET /api/suggestions/:id/clip — retorna o clip associado à sugestão
@@ -17,15 +18,34 @@ router.get('/:id/clip', async (req, res, next) => {
   }
 });
 
-// GET /api/suggestions/:id/metadata — retorna metadados YouTube gerados
+// GET /api/suggestions/:id/metadata — retorna metadados YouTube gerados (enriquecidos com Riot API se disponível)
 router.get('/:id/metadata', async (req, res, next) => {
   try {
     const result = await query(
-      'SELECT id, title, reason, clip_category, type FROM clip_suggestions WHERE id=$1',
+      `SELECT cs.id, cs.title, cs.reason, cs.clip_category, cs.type,
+              j.summoner_name, j.riot_region
+       FROM clip_suggestions cs
+       JOIN jobs j ON j.id = cs.job_id
+       WHERE cs.id=$1`,
       [req.params.id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Sugestão não encontrada' });
-    const metadata = generateYouTubeMetadata(result.rows[0]);
+
+    const row = result.rows[0];
+    let riotData = null;
+
+    if (row.summoner_name) {
+      const summoner = await getSummonerByName(row.summoner_name, row.riot_region);
+      if (summoner) {
+        const [rankData, champion] = await Promise.all([
+          getSummonerRank(summoner.encryptedId, row.riot_region),
+          getRecentMatchChampion(summoner.puuid, row.riot_region),
+        ]);
+        riotData = { ...(rankData || {}), champion };
+      }
+    }
+
+    const metadata = generateYouTubeMetadata(row, riotData);
     res.json(metadata);
   } catch (err) {
     next(err);

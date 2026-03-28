@@ -54,12 +54,12 @@ const chunkUpload = multer({
 // POST /api/jobs — cria job e inicia download em background
 router.post('/', jobCreateLimiter, async (req, res, next) => {
   try {
-    const { url, content_type } = req.body;
+    const { url, content_type, summoner_name, riot_region } = req.body;
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'Campo "url" é obrigatório' });
     }
 
-    const job = await createJob(url.trim(), content_type);
+    const job = await createJob(url.trim(), content_type, summoner_name, riot_region);
     res.status(201).json(job);
   } catch (err) {
     if (err.status === 400) return res.status(400).json({ error: err.message });
@@ -84,7 +84,7 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
 router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next) => {
   const multerFilePath = req.file?.path;
   try {
-    const { uploadId, chunkIndex, totalChunks, fileName, content_type } = req.body;
+    const { uploadId, chunkIndex, totalChunks, fileName, content_type, summoner_name, riot_region } = req.body;
     if (!req.file || !uploadId || chunkIndex === undefined || !totalChunks || !fileName) {
       return res.status(400).json({ error: 'Dados do chunk inválidos' });
     }
@@ -136,7 +136,7 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
         writeStream.on('error', reject);
       });
 
-      const job = await createJobFromFile(finalPath, fileName, content_type);
+      const job = await createJobFromFile(finalPath, fileName, content_type, summoner_name, riot_region);
       res.status(201).json({ job });
     } finally {
       assemblingUploads.delete(uploadId);

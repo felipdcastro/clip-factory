@@ -86,4 +86,28 @@ describe('generateYouTubeMetadata', () => {
     expect(result.description).toContain('#LoL');
     expect(result.description).toContain('#Shorts');
   });
+
+  it('com riotData → descrição inclui bloco ⚔️ com campeão e rank', () => {
+    const riotData = { champion: 'Azir', tier: 'PLATINUM', rank: 'II', leaguePoints: 75 };
+    const result = generateYouTubeMetadata({
+      title: 'Faker outplay',
+      reason: 'Jogada incrível',
+      clip_category: 'highlight',
+      type: 'video',
+    }, riotData);
+    expect(result.description).toContain('⚔️ Azir');
+    expect(result.description).toContain('PLATINUM II 75LP');
+  });
+
+  it('sem riotData → comportamento existente inalterado', () => {
+    const result = generateYouTubeMetadata({
+      title: 'Faker outplay',
+      reason: 'Jogada incrível',
+      clip_category: 'highlight',
+      type: 'video',
+    });
+    expect(result.description).not.toContain('⚔️');
+    expect(result.description).toContain('🏆');
+    expect(result.description).toContain('#Highlights');
+  });
 });

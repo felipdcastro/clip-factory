@@ -51,7 +51,7 @@ const loginLimiter = rateLimit({
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minuto
   max: isTest ? 0 : 120,
-  skip: () => isTest,
+  skip: (req) => isTest || req.originalUrl.includes('/upload-chunk'),
   message: { error: 'Muitas requisições. Tente novamente em instantes.' },
   standardHeaders: true,
   legacyHeaders: false,

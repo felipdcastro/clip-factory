@@ -43,6 +43,30 @@
             <button class="btn-content-type" data-type="mbl">
               <span class="ct-icon">🏛️</span> MBL / Política
             </button>
+            <button class="btn-content-type" data-type="lol-esports">
+              <span class="ct-icon">⚔️</span> LoL E-Sports
+            </button>
+          </div>
+        </div>
+
+        <!-- Campos de Summoner (apenas LoL) -->
+        <div id="summoner-fields" style="display:none;margin-bottom:12px">
+          <div class="input-row">
+            <input
+              type="text"
+              id="summoner-name-input"
+              placeholder="Summoner Name (opcional)"
+              autocomplete="off"
+              style="flex:2"
+            >
+            <select id="riot-region-select" style="flex:1;min-width:90px">
+              <option value="BR1">BR</option>
+              <option value="NA1">NA</option>
+              <option value="EUW1">EUW</option>
+              <option value="KR">KR</option>
+              <option value="LA1">LAN</option>
+              <option value="LA2">LAS</option>
+            </select>
           </div>
         </div>
 
