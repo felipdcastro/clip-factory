@@ -74,7 +74,21 @@ async function processAnalysis(jobId) {
     const validSuggestions = rawSuggestions.filter(s => validateSuggestion(s, job.duration_seconds, job.content_type));
 
     if (validSuggestions.length === 0) {
-      throw new Error('GPT não retornou sugestões válidas');
+      const limits = LIMITS_BY_CONTENT_TYPE[job.content_type] || LIMITS_BY_CONTENT_TYPE.mbl;
+      logger.warn({
+        raw_count: rawSuggestions.length,
+        content_type: job.content_type,
+        duration_seconds: job.duration_seconds,
+        limits,
+        raw_suggestions: rawSuggestions.map(s => ({
+          type: s.type,
+          duration: s.end_time - s.start_time,
+          start: s.start_time,
+          end: s.end_time,
+          clip_category: s.clip_category,
+        })),
+      }, 'Todas as sugestões foram filtradas — detalhes acima');
+      throw new Error(`GPT retornou ${rawSuggestions.length} sugestão(ões) mas nenhuma passou na validação de duração (limits: video ${limits.minVideo}-${limits.maxVideo}s, reel ${limits.minReel}-${limits.maxReel}s)`);
     }
 
     // 6. Salva no banco

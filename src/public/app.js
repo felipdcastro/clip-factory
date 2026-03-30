@@ -149,6 +149,7 @@ function getTranscriptSnippet(startTime, endTime) {
 }
 
 async function loadSuggestions(jobId, category) {
+  try {
   // Carrega transcrição para preview (apenas na primeira carga, sem filtro)
   if (!category) {
     const tx = await api('GET', `/api/jobs/${jobId}/transcription`);
@@ -159,6 +160,8 @@ async function loadSuggestions(jobId, category) {
     ? `/api/jobs/${jobId}/suggestions?category=${encodeURIComponent(category)}`
     : `/api/jobs/${jobId}/suggestions`;
   const data = await api('GET', url);
+  // eslint-disable-next-line no-console
+  console.log('[loadSuggestions] data:', data);
   if (!data || !data.suggestions) return;
 
   const section = document.getElementById('suggestions-section');
@@ -189,6 +192,10 @@ async function loadSuggestions(jobId, category) {
   }
 
   section.style.display = 'block';
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[loadSuggestions] erro:', err);
+  }
 }
 
 function renderCategoryFilters(jobId, activeCategory) {

@@ -5,24 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clip Factory — Login</title>
   <link rel="stylesheet" href="/style.css">
+  <style>
+    body {
+      background: radial-gradient(ellipse at 50% -10%, #0d1f3c 0%, #060c17 60%);
+      min-height: 100vh;
+    }
+    .login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  </style>
 </head>
 <body class="login-page">
   <div class="login-box">
-    <h1>🎬 Clip Factory</h1>
+    <div class="login-logo">✂️</div>
+    <h1>Clip Factory</h1>
     <p class="subtitle">YouTube Clip Automation</p>
 
     <form action="/auth/login" method="POST">
       <div class="form-group">
-        <label for="password">Senha</label>
-        <input type="password" id="password" name="password" placeholder="Digite a senha" autofocus required>
+        <label for="password">Senha de acesso</label>
+        <input type="password" id="password" name="password" placeholder="••••••••••••" autofocus required>
       </div>
-      <div id="login-error" class="error-msg" style="display:none">Senha incorreta.</div>
+      <div id="login-error" class="error-msg" style="display:none">
+        ⚠️ Senha incorreta. Tente novamente.
+      </div>
       <button type="submit" class="btn btn-primary btn-full">Entrar</button>
     </form>
   </div>
 
   <script>
-    // Mostra erro se redirecionado com ?error=1
     if (new URLSearchParams(location.search).get('error')) {
       document.getElementById('login-error').style.display = 'block';
     }
