@@ -47,7 +47,7 @@ describe('createJob', () => {
     expect(result.url).toBe(VALID_URL);
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO jobs'),
-      [VALID_URL, 'pending']
+      [VALID_URL, 'pending', 'mbl', null, 'BR1']
     );
   });
 });
