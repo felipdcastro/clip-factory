@@ -121,27 +121,15 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
     let finalPath;
     try {
       finalPath = path.join(TEMP_DIR, `${uploadId}${ext}`);
-      const writeStream = fs.createWriteStream(finalPath);
+      // Remove arquivo final se existir de tentativa anterior
+      try { fs.unlinkSync(finalPath); } catch { /* ignora */ }
 
       for (let i = 0; i < total; i++) {
         const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
-        await new Promise((resolve, reject) => {
-          const readable = fs.createReadStream(p);
-          readable.on('error', reject);
-          readable.on('end', () => {
-            try { fs.unlinkSync(p); } catch { /* ignora */ }
-            resolve();
-          });
-          readable.pipe(writeStream, { end: false });
-          writeStream.on('error', reject);
-        });
+        const data = await fs.promises.readFile(p);
+        await fs.promises.appendFile(finalPath, data);
+        await fs.promises.unlink(p);
       }
-
-      await new Promise((resolve, reject) => {
-        writeStream.end();
-        writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
-      });
 
       const job = await createJobFromFile(finalPath, fileName, content_type, summoner_name, riot_region);
       res.status(201).json({ job });
