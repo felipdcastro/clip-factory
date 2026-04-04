@@ -125,9 +125,16 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
 
       for (let i = 0; i < total; i++) {
         const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
-        const data = fs.readFileSync(p);
-        writeStream.write(data);
-        fs.unlinkSync(p);
+        await new Promise((resolve, reject) => {
+          const readable = fs.createReadStream(p);
+          readable.on('error', reject);
+          readable.on('end', () => {
+            try { fs.unlinkSync(p); } catch { /* ignora */ }
+            resolve();
+          });
+          readable.pipe(writeStream, { end: false });
+          writeStream.on('error', reject);
+        });
       }
 
       await new Promise((resolve, reject) => {
