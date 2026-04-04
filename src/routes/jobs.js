@@ -122,13 +122,21 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
     try {
       finalPath = path.join(TEMP_DIR, `${uploadId}${ext}`);
       // Remove arquivo final se existir de tentativa anterior
-      try { fs.unlinkSync(finalPath); } catch { /* ignora */ }
+      try { await fs.promises.unlink(finalPath); } catch { /* ignora */ }
 
-      for (let i = 0; i < total; i++) {
-        const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
-        const data = await fs.promises.readFile(p);
-        await fs.promises.appendFile(finalPath, data);
-        await fs.promises.unlink(p);
+      // Usa posição explícita (64-bit) para suportar arquivos > 4GB no Windows
+      const fh = await fs.promises.open(finalPath, 'w');
+      let position = 0;
+      try {
+        for (let i = 0; i < total; i++) {
+          const p = path.join(TEMP_DIR, `${uploadId}_chunk_${i}`);
+          const data = await fs.promises.readFile(p);
+          await fh.write(data, 0, data.length, position);
+          position += data.length;
+          await fs.promises.unlink(p);
+        }
+      } finally {
+        await fh.close();
       }
 
       const job = await createJobFromFile(finalPath, fileName, content_type, summoner_name, riot_region);
