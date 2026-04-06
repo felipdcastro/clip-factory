@@ -27,6 +27,8 @@ REGRAS PARA "reel" (shorts/reels verticais):
 - Priorize: o instante exato do pentakill/steal/outplay + reação dos casters
 - Título direto: "Faker PENTA 🔥", "Baron Steal INSANO", "O Outplay do Século" (máx 70 caracteres)
 
+OBRIGATÓRIO: você DEVE retornar sugestões dos DOIS tipos — "video" E "reel". Retornar apenas um tipo é inválido.
+
 FORMATO DE RESPOSTA (JSON obrigatório):
 {
   "suggestions": [
@@ -66,6 +68,7 @@ REGRAS:
 - Priorize: declarações polêmicas, debates acalorados, momentos marcantes, frases de impacto
 - Títulos devem ser chamativos e adequados para YouTube (máx 70 caracteres)
 - O campo "reason" deve explicar por que aquele trecho é viral/relevante
+OBRIGATÓRIO: você DEVE retornar sugestões dos DOIS tipos — "video" E "reel". Retornar apenas um tipo é inválido.
 
 FORMATO DE RESPOSTA (JSON obrigatório):
 {
@@ -101,6 +104,8 @@ REGRAS PARA "reel" (shorts/reels verticais):
 - Priorize: frases icônicas do Toguro, reações exageradas, punchlines engraçadas, momentos de raiva/alegria intensa, jogadas insanas, interações com a chat
 - O reel deve ser auto-contido — quem assiste entende sem contexto
 
+OBRIGATÓRIO: você DEVE retornar sugestões dos DOIS tipos — "video" E "reel". Retornar apenas um tipo é inválido.
+
 FORMATO DE RESPOSTA (JSON obrigatório):
 {
   "suggestions": [
@@ -135,6 +140,8 @@ REGRAS PARA "reel" (shorts/reels verticais):
 - Priorize: punchlines memoráveis, reações exageradas, momentos de gargalhada da plateia, frases icônicas, confusões engraçadas, auto-depreciação cômica
 - O reel deve ser auto-contido — quem assiste entende sem contexto
 
+OBRIGATÓRIO: você DEVE retornar sugestões dos DOIS tipos — "video" E "reel". Retornar apenas um tipo é inválido.
+
 FORMATO DE RESPOSTA (JSON obrigatório):
 {
   "suggestions": [
@@ -167,10 +174,12 @@ REGRAS PARA "video" (batalha completa por dupla):
 
 REGRAS PARA "reel" (melhores momentos):
 - Extraia os melhores punchlines, trocas quentes e reações da plateia
-- Duração: MÍNIMO 30 segundos e MÁXIMO 90 segundos cada
+- Duração: MÍNIMO 30 segundos e MÁXIMO 90 segundos cada (NUNCA ultrapasse 90s)
 - Formato vertical (9:16) — ideal para Instagram Reels e YouTube Shorts
 - Priorize: punchlines que geraram reação, trocas diretas entre os MCs, momentos de virada
-- Sugira 1 a 3 reels por dupla
+- Sugira 2 a 4 reels por dupla
+
+OBRIGATÓRIO: você DEVE retornar sugestões dos DOIS tipos — "video" E "reel". Retornar apenas um tipo é inválido.
 
 FORMATO DE RESPOSTA (JSON obrigatório):
 {
@@ -320,7 +329,7 @@ async function analyzeTranscription(transcriptionText, words, durationSeconds, c
 
     const response = await client.chat.completions.create({
       model: 'gpt-4o-mini',
-      temperature: 0.3,
+      temperature: 0.5,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },

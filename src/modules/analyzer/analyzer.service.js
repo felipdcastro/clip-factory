@@ -73,6 +73,19 @@ async function processAnalysis(jobId) {
 
     // 5. Valida e filtra sugestões
     const validSuggestions = rawSuggestions.filter(s => validateSuggestion(s, job.duration_seconds, job.content_type));
+    const dropped = rawSuggestions.length - validSuggestions.length;
+    if (dropped > 0) {
+      const limits = LIMITS_BY_CONTENT_TYPE[job.content_type] || LIMITS_BY_CONTENT_TYPE.mbl;
+      logger.warn({
+        dropped,
+        raw_count: rawSuggestions.length,
+        valid_count: validSuggestions.length,
+        limits,
+        dropped_items: rawSuggestions
+          .filter(s => !validateSuggestion(s, job.duration_seconds, job.content_type))
+          .map(s => ({ type: s.type, duration: Math.round(s.end_time - s.start_time), start: s.start_time, end: s.end_time })),
+      }, 'Sugestões filtradas pela validação de duração');
+    }
 
     if (validSuggestions.length === 0) {
       const limits = LIMITS_BY_CONTENT_TYPE[job.content_type] || LIMITS_BY_CONTENT_TYPE.mbl;
