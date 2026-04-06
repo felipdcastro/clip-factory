@@ -96,6 +96,6 @@ describe('analyzeTranscription', () => {
     await analyzeTranscription('Texto longo', words, 600);
     const callArgs = mockCreate.mock.calls[0][0];
     // O userPrompt deve conter o texto com marcadores de tempo
-    expect(callArgs.messages[1].content).toContain('[0m00s]');
+    expect(callArgs.messages[1].content).toContain('[0s]');
   });
 });

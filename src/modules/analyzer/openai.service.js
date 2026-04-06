@@ -222,17 +222,16 @@ function getSystemPrompt(contentType) {
 function formatTranscriptionForPrompt(text, words, durationSeconds) {
   const minutes = Math.floor(durationSeconds / 60);
 
-  // Intercala marcadores de tempo [Xm Ys] a cada 30 segundos no texto
+  // Intercala marcadores de tempo [Xs] a cada 60 segundos no texto
+  // Formato simples em segundos — GPT deve usar esses valores DIRETAMENTE em start_time/end_time
   let timedText = '';
   if (Array.isArray(words) && words.length > 0) {
     let nextMarkerSec = 0;
     words.forEach(word => {
       const wordStartSec = word.start / 1000;
       if (wordStartSec >= nextMarkerSec) {
-        const m = Math.floor(nextMarkerSec / 60);
-        const s = Math.floor(nextMarkerSec % 60);
-        timedText += `\n[${m}m${String(s).padStart(2,'0')}s] `;
-        nextMarkerSec += 30;
+        timedText += `\n[${Math.floor(nextMarkerSec)}s] `;
+        nextMarkerSec += 60;
       }
       timedText += word.text + ' ';
     });
@@ -240,9 +239,9 @@ function formatTranscriptionForPrompt(text, words, durationSeconds) {
     timedText = text;
   }
 
-  return `DURAÇÃO TOTAL: ${minutes} minutos (${durationSeconds} segundos)
+  return `DURAÇÃO TOTAL: ${durationSeconds} segundos (${minutes} minutos)
 
-IMPORTANTE: Os marcadores [Xm Ys] indicam o timestamp exato no vídeo. Use esses valores para definir start_time e end_time em segundos.
+IMPORTANTE: Os marcadores [Xs] indicam o segundo exato no vídeo. Use esses valores DIRETAMENTE para start_time e end_time. Exemplo: marcador [300s] = start_time: 300.0. Um clip de 5 minutos a partir de [600s] = start_time: 600.0, end_time: 900.0.
 
 TRANSCRIÇÃO COM TIMESTAMPS:
 ${timedText.trim()}`;
