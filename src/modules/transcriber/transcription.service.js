@@ -50,8 +50,12 @@ async function processTranscription(jobId) {
       ]
     );
 
-    // 7. Atualiza status do job
-    await query("UPDATE jobs SET status='transcribed', updated_at=NOW() WHERE id=$1", [jobId]);
+    // 7. Atualiza status do job e salva duration_seconds
+    const audioDuration = result.audio_duration || job.duration_seconds;
+    await query(
+      "UPDATE jobs SET status='transcribed', duration_seconds=$1, updated_at=NOW() WHERE id=$2",
+      [audioDuration, jobId]
+    );
 
     logger.info({ job_id: jobId }, `Job ${jobId} transcrito com sucesso`);
 
