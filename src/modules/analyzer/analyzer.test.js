@@ -14,23 +14,23 @@ const { analyzeTranscription } = require('./openai.service');
 const { processAnalysis, updateSuggestionStatus, validateSuggestion, backfillClipCategory, getSuggestions } = require('./analyzer.service');
 
 describe('validateSuggestion', () => {
-  // video requer duração entre 5-10 min (300-600s); reel entre 45-60s
+  // mbl: video 180-720s; reel 30-90s
   const base = { start_time: 10, end_time: 370, title: 'Título teste', reason: 'Motivo', type: 'video' };
 
   it('aceita sugestão válida de vídeo', () => {
     expect(validateSuggestion(base, 3600)).toBe(true);
   });
 
-  it('aceita reel válido (45-60s)', () => {
+  it('aceita reel válido (30-90s)', () => {
     expect(validateSuggestion({ ...base, start_time: 10, end_time: 65, type: 'reel' }, 3600)).toBe(true);
   });
 
-  it('rejeita clip muito curto (< 300s para video)', () => {
+  it('rejeita clip muito curto (< 180s para video)', () => {
     expect(validateSuggestion({ ...base, end_time: 25 }, 3600)).toBe(false);
   });
 
-  it('rejeita vídeo muito longo (> 10min)', () => {
-    expect(validateSuggestion({ ...base, end_time: 700 }, 3600)).toBe(false);
+  it('rejeita vídeo muito longo (> 12min)', () => {
+    expect(validateSuggestion({ ...base, end_time: 740 }, 3600)).toBe(false);
   });
 
   it('rejeita reel muito longo (> 90s)', () => {
