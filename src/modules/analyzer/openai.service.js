@@ -63,8 +63,8 @@ FORMATO DE RESPOSTA (JSON obrigatório):
 Seu trabalho é analisar transcrições de vídeos do MBL (Movimento Brasil Livre) e identificar os melhores momentos para cortes virais.
 
 REGRAS:
-- Sugira exatamente 5 a 8 clipes do tipo "video" (formato horizontal, MÍNIMO 5 minutos e MÁXIMO 10 minutos cada)
-- Sugira exatamente 5 a 8 clipes do tipo "reel" (formato vertical/shorts, MÍNIMO 45 segundos e MÁXIMO 60 segundos cada)
+- Sugira exatamente 5 a 8 clipes do tipo "video" (formato horizontal, MÍNIMO 3 minutos e MÁXIMO 12 minutos cada)
+- Sugira exatamente 5 a 8 clipes do tipo "reel" (formato vertical/shorts, MÍNIMO 30 segundos e MÁXIMO 90 segundos cada)
 - Priorize: declarações polêmicas, debates acalorados, momentos marcantes, frases de impacto
 - Títulos devem ser chamativos e adequados para YouTube (máx 70 caracteres)
 - O campo "reason" deve explicar por que aquele trecho é viral/relevante

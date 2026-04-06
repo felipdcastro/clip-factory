@@ -5,7 +5,7 @@ const logger = require('../../utils/logger').child({ module: 'analyzer' });
 const CATEGORY_PREFIX_RE = /^\[CATEGORY:\s*(highlight|educational|funny)\]\s*/;
 
 const LIMITS_BY_CONTENT_TYPE = {
-  mbl:               { minReel: 45, maxReel: 60,  minVideo: 300,  maxVideo: 600  },
+  mbl:               { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 720  },
   'batalha-de-rima': { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 1200 },
   toguro:            { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 720  },
   'lol-esports':     { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 600  },
@@ -63,11 +63,12 @@ async function processAnalysis(jobId) {
       ? JSON.parse(transcription.words)
       : transcription.words || [];
 
-    // 4. Chama GPT
+    // 4. Chama GPT — usa duration da transcrição se job.duration_seconds for null
+    const durationSeconds = job.duration_seconds || transcription.duration_seconds || null;
     const rawSuggestions = await analyzeTranscription(
       transcription.text,
       words,
-      job.duration_seconds,
+      durationSeconds,
       job.content_type
     );
 
