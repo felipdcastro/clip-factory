@@ -9,6 +9,7 @@ const LIMITS_BY_CONTENT_TYPE = {
   'batalha-de-rima': { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 1200 },
   toguro:            { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 720  },
   'lol-esports':     { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 600  },
+  comedia:           { minReel: 30, maxReel: 90,  minVideo: 180,  maxVideo: 720  },
 };
 
 /**

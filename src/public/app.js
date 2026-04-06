@@ -533,7 +533,7 @@ async function loadRecentJobs() {
     const badge = STATUS_BADGE[job.status] || { label: job.status, bg: 'rgba(120,120,120,0.15)', color: '#888' };
     const row = document.createElement('div');
     row.className = 'job-row';
-    const ctIcons = { 'batalha-de-rima': '🎤', toguro: '🎮', mbl: '🏛️' };
+    const ctIcons = { 'batalha-de-rima': '🎤', toguro: '🎮', mbl: '🏛️', comedia: '😂', 'lol-esports': '⚔️' };
     const ctIcon = ctIcons[job.content_type] || '🎬';
     row.innerHTML = `
       <span class="job-status-badge" style="background:${badge.bg};color:${badge.color};border:1px solid ${badge.color}33">${badge.label}</span>
