@@ -2,12 +2,56 @@
 
 'use strict';
 
+// ── YouTube Status ────────────────────────────────────────────────────────
+
+async function checkYouTubeStatus() {
+  const el = document.getElementById('yt-status');
+  if (!el) return;
+
+  const data = await api('GET', '/auth/youtube/status');
+  if (!data) return;
+
+  const STATES = {
+    connected:      { label: 'YouTube',        cls: 'connected',      href: null },
+    expired:        { label: 'Token expirado',  cls: 'expired',        href: '/auth/youtube' },
+    disconnected:   { label: 'Conectar YouTube', cls: 'disconnected',  href: '/auth/youtube' },
+    not_configured: { label: 'YT não config.',  cls: 'not-configured', href: null },
+  };
+
+  const cfg = STATES[data.status] || STATES.disconnected;
+  el.className = `yt-status ${cfg.cls}`;
+  el.innerHTML = cfg.href
+    ? `<a href="${cfg.href}" class="yt-status-link"><span class="yt-dot"></span>${cfg.label}</a>`
+    : `<span class="yt-dot"></span>${cfg.label}`;
+}
+
+function showToast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.classList.add('toast-visible'), 10);
+  setTimeout(() => { t.classList.remove('toast-visible'); setTimeout(() => t.remove(), 300); }, 4000);
+}
+
+// Trata redirect do OAuth YouTube
+(function handleOAuthRedirect() {
+  const params = new URLSearchParams(location.search);
+  const result = params.get('youtube_auth');
+  if (!result) return;
+  history.replaceState({}, '', location.pathname);
+  if (result === 'success') showToast('YouTube conectado com sucesso!', 'success');
+  else showToast('Falha ao conectar o YouTube. Tente novamente.', 'error');
+})();
+
+checkYouTubeStatus();
+
 // ── Estado ────────────────────────────────────────────────────────────────
 let currentJobId = null;
 let currentJob = null;
 let jobPollInterval = null;
 let transcriptionWords = [];
-let selectedContentType = 'batalha-de-rima';
+let selectedContentType = 'auto';
 
 // Paleta de cores por clip_category (LoL)
 const CATEGORY_COLORS = {
@@ -94,11 +138,26 @@ function updateProgress(status, errorMessage) {
       : (STATUS_LABELS[status] || status);
 
   const activeSteps = STEPS[status] || [];
-  ['step-downloading','step-transcribing','step-analyzing','step-analyzed'].forEach(id => {
+  const stepIds = ['step-downloading','step-transcribing','step-analyzing','step-analyzed'];
+  const connIds = ['conn-1','conn-2','conn-3'];
+
+  stepIds.forEach((id, idx) => {
     const el = document.getElementById(id);
     el.classList.remove('active','done');
     if (activeSteps.includes(id)) {
-      el.classList.add(id === activeSteps[activeSteps.length - 1] ? 'active' : 'done');
+      const isLast = id === activeSteps[activeSteps.length - 1];
+      el.classList.add(isLast ? 'active' : 'done');
+    }
+    // connectors
+    const conn = document.getElementById(connIds[idx]);
+    if (conn) {
+      conn.className = 'step-connector';
+      const prevStep = stepIds[idx]; // connector after this step
+      if (activeSteps.includes(prevStep) && prevStep !== activeSteps[activeSteps.length - 1]) {
+        conn.classList.add('done');
+      } else if (activeSteps.includes(prevStep)) {
+        conn.classList.add('active');
+      }
     }
   });
 }
@@ -225,22 +284,70 @@ function buildSuggestionCard(s) {
     ? `<span class="category-badge" style="background:${catColors.bg};color:${catColors.text}">${esc(s.clip_category)}</span>`
     : '';
 
+  // SEO Squad: dados otimizados (prioridade sobre sugestão bruta do GPT)
+  const hasSEO = !!(s.seo_score || s.seo_title);
+  const activeTags = hasSEO
+    ? (Array.isArray(s.seo_tags) ? s.seo_tags : [])
+    : (Array.isArray(s.suggested_tags) ? s.suggested_tags : null);
+  const activeDesc = hasSEO ? s.seo_description : s.suggested_description;
+
+  const seoScoreCls = s.seo_score >= 70 ? 'high' : s.seo_score >= 50 ? 'mid' : 'low';
+  const seoBadgeHtml = s.seo_score
+    ? `<span class="seo-score-badge seo-score-${seoScoreCls}" title="SEO Score">⚡${s.seo_score}</span>`
+    : '';
+  const seoThumbHtml = s.thumbnail_offset_sec
+    ? `<div class="seo-thumb-hint">🖼️ Melhor frame: +${parseFloat(s.thumbnail_offset_sec).toFixed(1)}s</div>`
+    : '';
+
+  const tagsHtml = activeTags && activeTags.length
+    ? `<div class="card-tags">${activeTags.map(t => `<span class="tag-pill${hasSEO ? ' seo-tag' : ''}">${esc(t)}</span>`).join('')}</div>`
+    : '';
+  const descHtml = activeDesc
+    ? `<div class="card-desc-preview">${esc(activeDesc)}</div>`
+    : '';
+
+  const metaLabel = hasSEO ? '⚡ SEO Squad' : '✦ Metadados sugeridos';
+  const suggestedMetaHtml = (tagsHtml || descHtml || hasSEO)
+    ? `<div class="card-suggested-meta">
+        <div class="card-suggested-meta-label">${metaLabel}${seoBadgeHtml}</div>
+        ${s.seo_title && s.seo_title !== s.title ? `<div class="seo-optimized-title">${esc(s.seo_title)}</div>` : ''}
+        ${tagsHtml}
+        ${descHtml}
+        ${seoThumbHtml}
+       </div>`
+    : '';
+
   card.innerHTML = `
-    <div class="card-header">
-      <div class="card-title">${esc(s.title)}${categoryBadge}</div>
-      <div class="card-meta">
-        <span class="badge badge-${s.type}">${s.type === 'video' ? 'VÍDEO' : 'REEL'}</span>
-        <span class="timestamps">${fmt(s.start_time)} → ${fmt(s.end_time)} (${dur(s.start_time, s.end_time)})</span>
-      </div>
+    <div class="card-thumb-wrap">
+      <img
+        class="card-thumb"
+        src="/api/suggestions/${s.id}/thumbnail"
+        alt="Preview"
+        loading="lazy"
+        onerror="this.parentElement.style.display='none'"
+      >
     </div>
-    ${s.reason ? `<div class="card-reason">${esc(s.reason)}</div>` : ''}
-    ${snippet   ? `<div class="card-transcript">${esc(snippet)}</div>` : ''}
-    <div class="card-actions" id="actions-${s.id}">
-      ${isDecided
-        ? renderDecidedActions(s)
-        : `<button class="btn btn-success btn-sm" onclick="decideSuggestion(${s.id},'approved',this)">✓ Aprovar</button>
-           <button class="btn btn-danger btn-sm"  onclick="decideSuggestion(${s.id},'rejected',this)">✗ Rejeitar</button>`
-      }
+    <div class="card-body">
+      <div class="card-header">
+        <div class="card-title">${esc(s.title)}${categoryBadge}</div>
+        <div class="card-meta">
+          <span class="badge badge-${s.type}">${s.type === 'video' ? 'VÍDEO' : 'REEL'}</span>
+          <span class="timestamps">${fmt(s.start_time)} → ${fmt(s.end_time)} (${dur(s.start_time, s.end_time)})</span>
+        </div>
+      </div>
+      ${s.reason ? `<div class="card-reason">${esc(s.reason)}</div>` : ''}
+      ${suggestedMetaHtml}
+      ${snippet   ? `<div class="card-transcript">${esc(snippet)}</div>` : ''}
+      <div class="card-actions" id="actions-${s.id}">
+        ${isDecided
+          ? renderDecidedActions(s)
+          : `<button class="btn btn-success btn-sm" onclick="decideSuggestion(${s.id},'approved',this)">✓ Aprovar</button>
+             <button class="btn btn-danger btn-sm"  onclick="decideSuggestion(${s.id},'rejected',this)">✗ Rejeitar</button>`
+        }
+        <button class="btn btn-seo btn-sm" id="seo-btn-${s.id}" onclick="runSEO(${s.id}, this)"
+          title="Executar SEO Squad — otimiza título, tags, descrição e thumbnail"
+        >${hasSEO ? '⚡ Re-SEO' : '⚡ SEO'}</button>
+      </div>
     </div>
   `;
   return card;
@@ -335,6 +442,7 @@ async function buildUploadForm(clip, suggestionId) {
   form.className = 'upload-form';
   form.id = `upload-form-${suggestionId}`;
   form.innerHTML = `
+    <button class="btn btn-ghost btn-sm preview-btn" onclick="openPreview(${clip.id})">▶ Pré-visualizar</button>
     <div class="upload-form-title">📅 Agendar publicação</div>
     <div class="upload-row">
       <div class="form-group">
@@ -348,33 +456,71 @@ async function buildUploadForm(clip, suggestionId) {
     </div>
     <div class="form-group" style="margin-top:10px">
       <label>Descrição</label>
-      <textarea id="upload-desc-${suggestionId}" rows="2" placeholder="Descrição opcional..."></textarea>
+      <textarea id="upload-desc-${suggestionId}" rows="3" placeholder="Descrição do vídeo..."></textarea>
+    </div>
+    <div class="form-group" style="margin-top:10px">
+      <label>Tags <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0">(separadas por vírgula, máx 15)</span></label>
+      <input type="text" id="upload-tags-${suggestionId}" placeholder="tag1, tag2, tag3..." maxlength="500">
     </div>
     <button class="btn btn-primary btn-sm" style="margin-top:8px"
       onclick="scheduleUpload(${clip.id}, ${suggestionId})">Agendar Upload</button>
     <span class="clip-status" id="upload-status-${suggestionId}"></span>
   `;
 
-  // Pré-preenche título e descrição com metadados gerados
+  // Pré-preenche título, descrição e tags com metadados gerados pela IA
   const meta = await api('GET', `/api/suggestions/${suggestionId}/metadata`);
-  if (meta && meta.title) {
+  if (meta) {
     const titleInput = document.getElementById(`upload-title-${suggestionId}`);
     const descInput  = document.getElementById(`upload-desc-${suggestionId}`);
-    if (titleInput) titleInput.value = meta.title.substring(0, 100);
-    if (descInput)  descInput.value  = meta.description || '';
+    const tagsInput  = document.getElementById(`upload-tags-${suggestionId}`);
+    if (titleInput && meta.title) titleInput.value = meta.title.substring(0, 100);
+    if (descInput  && meta.description) descInput.value = meta.description;
+    if (tagsInput  && Array.isArray(meta.tags) && meta.tags.length) {
+      tagsInput.value = meta.tags.join(', ');
+    }
   }
 
   return form;
 }
 
+// ── Preview Modal ──────────────────────────────────────────────────────────
+
+// eslint-disable-next-line no-unused-vars
+function openPreview(clipId) {
+  const modal = document.getElementById('preview-modal');
+  const video = document.getElementById('preview-video');
+  video.src = `/api/clips/${clipId}/stream`;
+  modal.classList.add('open');
+  video.play().catch(() => {});
+}
+
+// eslint-disable-next-line no-unused-vars
+function closePreview(e) {
+  if (e && e.target !== document.getElementById('preview-modal') && !e.target.classList.contains('preview-close')) return;
+  const modal = document.getElementById('preview-modal');
+  const video = document.getElementById('preview-video');
+  video.pause();
+  video.src = '';
+  modal.classList.remove('open');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closePreview({ target: document.getElementById('preview-modal') });
+});
+
 // eslint-disable-next-line no-unused-vars
 async function scheduleUpload(clipId, suggestionId) {
-  const title = document.getElementById(`upload-title-${suggestionId}`).value.trim();
-  const desc  = document.getElementById(`upload-desc-${suggestionId}`).value.trim();
-  const date  = document.getElementById(`upload-date-${suggestionId}`).value;
+  const title    = document.getElementById(`upload-title-${suggestionId}`).value.trim();
+  const desc     = document.getElementById(`upload-desc-${suggestionId}`).value.trim();
+  const date     = document.getElementById(`upload-date-${suggestionId}`).value;
+  const tagsRaw  = document.getElementById(`upload-tags-${suggestionId}`).value.trim();
   const statusEl = document.getElementById(`upload-status-${suggestionId}`);
 
   if (!title) { statusEl.textContent = 'Título obrigatório'; return; }
+
+  const tags = tagsRaw
+    ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
+    : null;
 
   statusEl.textContent = 'Agendando...';
 
@@ -382,6 +528,7 @@ async function scheduleUpload(clipId, suggestionId) {
     clip_id: clipId,
     title,
     description: desc,
+    tags,
     scheduled_at: date ? new Date(date).toISOString() : null,
   });
 
@@ -533,7 +680,7 @@ async function loadRecentJobs() {
     const badge = STATUS_BADGE[job.status] || { label: job.status, bg: 'rgba(120,120,120,0.15)', color: '#888' };
     const row = document.createElement('div');
     row.className = 'job-row';
-    const ctIcons = { 'batalha-de-rima': '🎤', toguro: '🎮', mbl: '🏛️', comedia: '😂', 'lol-esports': '⚔️' };
+    const ctIcons = { 'batalha-de-rima': '🎤', toguro: '🎮', mbl: '🏛️', comedia: '😂', 'lol-esports': '⚔️', sinuca: '🎱', 'slap-battles': '🤜' };
     const ctIcon = ctIcons[job.content_type] || '🎬';
     row.innerHTML = `
       <span class="job-status-badge" style="background:${badge.bg};color:${badge.color};border:1px solid ${badge.color}33">${badge.label}</span>
@@ -600,3 +747,135 @@ document.getElementById('url-form').addEventListener('submit', async (e) => {
   startPolling(job.id);
   btn.disabled = false;
 });
+
+// ── SEO Squad ─────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line no-unused-vars
+async function runSEO(suggestionId, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ Analisando...';
+
+  const result = await api('POST', `/api/suggestions/${suggestionId}/seo`);
+
+  if (!result || result.error) {
+    btn.disabled = false;
+    btn.textContent = '⚡ SEO';
+    showToast(result?.error || 'Erro ao executar SEO Squad', 'error');
+    return;
+  }
+
+  const card = document.getElementById(`suggestion-${suggestionId}`);
+
+  // Remove SEO info anterior e recria com dados atualizados
+  card.querySelectorAll('.card-suggested-meta').forEach(el => el.remove());
+
+  const seoScoreCls = result.seoScore >= 70 ? 'high' : result.seoScore >= 50 ? 'mid' : 'low';
+  const tagsHtml = (result.seoTags || [])
+    .map(t => `<span class="tag-pill seo-tag">${esc(t)}</span>`).join('');
+  const thumbHtml = result.thumbnailOffsetSec
+    ? `<div class="seo-thumb-hint">🖼️ Melhor frame: +${result.thumbnailOffsetSec.toFixed(1)}s — ${esc(result.thumbnailRationale || '')}</div>`
+    : '';
+
+  const seoBlock = document.createElement('div');
+  seoBlock.className = 'card-suggested-meta';
+  seoBlock.innerHTML = `
+    <div class="card-suggested-meta-label">⚡ SEO Squad
+      <span class="seo-score-badge seo-score-${seoScoreCls}" title="SEO Score">⚡${result.seoScore}</span>
+    </div>
+    ${result.seoTitle ? `<div class="seo-optimized-title">${esc(result.seoTitle)}</div>` : ''}
+    <div class="card-tags">${tagsHtml}</div>
+    ${result.seoDescription ? `<div class="card-desc-preview">${esc(result.seoDescription)}</div>` : ''}
+    ${thumbHtml}
+    ${result.strategy ? `<div class="seo-strategy-hint">${esc(result.strategy)}</div>` : ''}
+  `;
+
+  const cardActions = card.querySelector('.card-actions');
+  cardActions.parentElement.insertBefore(seoBlock, cardActions);
+
+  // Atualiza thumbnail com o frame recomendado
+  const thumbImg = card.querySelector('.card-thumb');
+  if (thumbImg && result.thumbnailOffsetSec) {
+    thumbImg.src = `/api/suggestions/${suggestionId}/thumbnail?t=${Date.now()}`;
+  }
+
+  btn.textContent = '⚡ Re-SEO';
+  btn.disabled = false;
+  showToast(`SEO Score: ${result.seoScore}/100 — ${result.strategy || 'Otimização concluída'}`, 'success');
+}
+
+// ── Painel de Custos ──────────────────────────────────────────────────────
+let costsLoaded = false;
+
+function toggleCosts() {
+  const body    = document.getElementById('costs-body');
+  const chevron = document.getElementById('costs-chevron');
+  const open    = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  chevron.textContent = open ? '▲' : '▼';
+  if (open && !costsLoaded) loadCosts();
+}
+
+async function loadCosts() {
+  const el = document.getElementById('costs-content');
+  try {
+    const d = await api('GET', '/api/costs');
+    costsLoaded = true;
+
+    const badge = document.getElementById('costs-total-badge');
+    badge.textContent = `$${d.combined.month.toFixed(4)} este mês`;
+
+    const fmtUsd = v => `$${parseFloat(v).toFixed(4)}`;
+    const bar = (label, val, total) => {
+      const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+      return `<div class="cost-bar-wrap">
+        <span class="cost-bar-label">${label}</span>
+        <div class="cost-bar-track"><div class="cost-bar-fill" style="width:${pct}%"></div></div>
+        <span class="cost-bar-value">${fmtUsd(val)}</span>
+      </div>`;
+    };
+
+    const periods = [
+      ['Hoje',       d.combined.today, d.assemblyai.today, d.openai.today],
+      ['7 dias',     d.combined.week,  d.assemblyai.week,  d.openai.week],
+      ['30 dias',    d.combined.month, d.assemblyai.month, d.openai.month],
+      ['Total',      d.combined.total, d.assemblyai.total, d.openai.total],
+    ];
+
+    const rows = periods.map(([label, total, ai, gpt]) =>
+      `<tr>
+        <td class="cost-td-label">${label}</td>
+        <td class="cost-td">${fmtUsd(ai)}</td>
+        <td class="cost-td">${fmtUsd(gpt)}</td>
+        <td class="cost-td cost-td-total">${fmtUsd(total)}</td>
+      </tr>`
+    ).join('');
+
+    const topRows = (d.top_jobs || []).map(j =>
+      `<tr>
+        <td class="cost-td-label" title="${esc(j.title || '')}">${esc((j.title || 'sem título').substring(0, 40))}</td>
+        <td class="cost-td">${fmtUsd(j.assemblyai)}</td>
+        <td class="cost-td">${fmtUsd(j.openai)}</td>
+        <td class="cost-td cost-td-total">${fmtUsd(j.total)}</td>
+      </tr>`
+    ).join('');
+
+    el.innerHTML = `
+      <table class="cost-table">
+        <thead><tr>
+          <th></th><th>AssemblyAI</th><th>OpenAI GPT</th><th>Total</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${topRows ? `
+        <div class="cost-section-title">Top jobs por custo</div>
+        <table class="cost-table">
+          <thead><tr>
+            <th>Job</th><th>AssemblyAI</th><th>OpenAI GPT</th><th>Total</th>
+          </tr></thead>
+          <tbody>${topRows}</tbody>
+        </table>` : ''}
+    `;
+  } catch {
+    el.textContent = 'Erro ao carregar custos.';
+  }
+}

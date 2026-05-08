@@ -5,26 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clip Factory — Login</title>
   <link rel="stylesheet" href="/style.css">
-  <style>
-    body {
-      background: radial-gradient(ellipse at 50% -10%, #0d1f3c 0%, #060c17 60%);
-      min-height: 100vh;
-    }
-    .login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-  </style>
 </head>
 <body class="login-page">
   <div class="login-box">
     <div class="login-logo">✂️</div>
     <h1>Clip Factory</h1>
-    <p class="subtitle">YouTube Clip Automation</p>
+    <p class="subtitle">Pipeline de Clips Automático</p>
 
     <form action="/auth/login" method="POST">
       <div class="form-group">
         <label for="password">Senha de acesso</label>
         <input type="password" id="password" name="password" placeholder="••••••••••••" autofocus required>
       </div>
-      <div id="login-error" class="error-msg" style="display:none">
+      <div id="login-error" class="error-msg" style="display:none;margin-bottom:14px">
         ⚠️ Senha incorreta. Tente novamente.
       </div>
       <button type="submit" class="btn btn-primary btn-full">Entrar</button>

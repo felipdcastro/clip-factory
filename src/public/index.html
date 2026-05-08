@@ -12,18 +12,21 @@
   <header>
     <div class="header-brand">
       <div class="header-logo">✂️</div>
-      <span class="header-title">Clip <span>Factory</span></span>
+      <div class="header-title-wrap">
+        <span class="header-title">Clip <span>Factory</span></span>
+        <span class="header-subtitle">Pipeline de Clips Automático</span>
+      </div>
     </div>
+    <div id="yt-status" class="yt-status" title="Status YouTube"></div>
     <form action="/auth/logout" method="POST">
       <button type="submit" class="logout-btn">Sair</button>
     </form>
-    <div class="header-gold-line"></div>
   </header>
 
   <main>
 
     <!-- Painel de novo job -->
-    <div class="panel mb-20">
+    <div class="panel mb-24">
       <div class="panel-header">
         <div class="panel-icon">＋</div>
         <span class="panel-title">Novo Job</span>
@@ -34,7 +37,10 @@
         <div class="content-type-wrapper">
           <div class="content-type-label">Tipo de conteúdo</div>
           <div class="content-type-tabs" id="content-type-selector">
-            <button class="btn-content-type active" data-type="batalha-de-rima">
+            <button class="btn-content-type active" data-type="auto">
+              <span class="ct-icon">✨</span> Auto-detectar
+            </button>
+            <button class="btn-content-type" data-type="batalha-de-rima">
               <span class="ct-icon">🎤</span> Batalha de Rima
             </button>
             <button class="btn-content-type" data-type="toguro">
@@ -49,11 +55,14 @@
             <button class="btn-content-type" data-type="lol-esports">
               <span class="ct-icon">⚔️</span> LoL E-Sports
             </button>
+            <button class="btn-content-type" data-type="sinuca">
+              <span class="ct-icon">🎱</span> Sinuca
+            </button>
           </div>
         </div>
 
         <!-- Campos de Summoner (apenas LoL) -->
-        <div id="summoner-fields" style="display:none;margin-bottom:12px">
+        <div id="summoner-fields" style="display:none;margin-bottom:16px">
           <div class="input-row">
             <input
               type="text"
@@ -62,7 +71,7 @@
               autocomplete="off"
               style="flex:2"
             >
-            <select id="riot-region-select" style="flex:1;min-width:90px">
+            <select id="riot-region-select" style="flex:1;min-width:90px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:var(--radius);color:var(--text);padding:12px 14px;font-family:inherit;font-size:0.9rem;outline:none">
               <option value="BR1">BR</option>
               <option value="NA1">NA</option>
               <option value="EUW1">EUW</option>
@@ -73,9 +82,9 @@
           </div>
         </div>
 
-        <!-- URL do YouTube -->
+        <!-- URL do YouTube — hero input -->
         <form id="url-form">
-          <div class="input-row">
+          <div class="hero-input-wrap">
             <input
               type="url"
               id="url-input"
@@ -83,7 +92,7 @@
               autocomplete="off"
             >
             <button type="submit" class="btn btn-primary" id="submit-btn">
-              ▶ Processar URL
+              ▶ Processar
             </button>
           </div>
         </form>
@@ -92,12 +101,12 @@
 
         <!-- Upload de arquivo -->
         <form id="upload-form">
-          <div class="upload-zone" id="upload-zone">
-            <input type="file" id="file-input" accept=".mp4,.mkv,.avi,.mov,.webm">
+          <input type="file" id="file-input" accept=".mp4,.mkv,.avi,.mov,.webm" style="display:none">
+          <label class="upload-zone" id="upload-zone" for="file-input">
             <div class="upload-zone-icon">📁</div>
             <div class="upload-zone-label">Clique ou arraste o vídeo aqui</div>
-            <div class="upload-zone-hint">MP4, MKV, AVI, MOV, WEBM</div>
-          </div>
+            <div class="upload-zone-hint">MP4, MKV, AVI, MOV, WEBM · até 4 GB (fragmentado)</div>
+          </label>
           <button type="submit" class="btn btn-primary btn-full" id="upload-btn" style="display:none">
             ↑ Enviar Vídeo
           </button>
@@ -107,43 +116,82 @@
       </div>
     </div>
 
-    <!-- Status Bar -->
-    <div id="status-bar" class="status-bar panel mb-20">
-      <div class="status-label">Processamento</div>
-      <div id="status-text" class="status-message"></div>
+    <!-- Status Bar / Pipeline -->
+    <div id="status-bar" class="status-bar panel mb-24">
+      <div class="status-top">
+        <div class="status-label">Pipeline</div>
+        <div id="status-text" class="status-message"></div>
+      </div>
       <div class="progress-steps">
-        <span class="step" id="step-downloading">
-          <span class="dot"></span> Baixando
-        </span>
-        <span class="step-arrow">›</span>
-        <span class="step" id="step-transcribing">
-          <span class="dot"></span> Transcrevendo
-        </span>
-        <span class="step-arrow">›</span>
-        <span class="step" id="step-analyzing">
-          <span class="dot"></span> Analisando
-        </span>
-        <span class="step-arrow">›</span>
-        <span class="step" id="step-analyzed">
-          <span class="dot"></span> Pronto
-        </span>
+
+        <div class="step" id="step-downloading">
+          <div class="step-dot">⬇</div>
+          <div class="step-label">Download</div>
+        </div>
+
+        <div class="step-connector" id="conn-1"></div>
+
+        <div class="step" id="step-transcribing">
+          <div class="step-dot">🎙</div>
+          <div class="step-label">Transcrição</div>
+        </div>
+
+        <div class="step-connector" id="conn-2"></div>
+
+        <div class="step" id="step-analyzing">
+          <div class="step-dot">🤖</div>
+          <div class="step-label">Análise IA</div>
+        </div>
+
+        <div class="step-connector" id="conn-3"></div>
+
+        <div class="step" id="step-analyzed">
+          <div class="step-dot">✓</div>
+          <div class="step-label">Pronto</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Painel de Custos -->
+    <div class="panel mb-24" id="costs-panel">
+      <div class="panel-header" style="cursor:pointer" onclick="toggleCosts()">
+        <div class="panel-icon">💰</div>
+        <span class="panel-title">Custos de API</span>
+        <span id="costs-total-badge" class="costs-badge"></span>
+        <span id="costs-chevron" style="margin-left:auto;opacity:0.5">▼</span>
+      </div>
+      <div id="costs-body" class="panel-body" style="display:none">
+        <div id="costs-content">Carregando...</div>
       </div>
     </div>
 
     <!-- Jobs Recentes -->
-    <div id="jobs-section" class="mb-20">
-      <div class="section-title">Jobs recentes</div>
+    <div id="jobs-section" class="mb-24">
+      <div class="section-header">
+        <div class="section-title">Jobs recentes</div>
+      </div>
       <div id="jobs-list"></div>
     </div>
 
     <!-- Sugestões de corte -->
     <div id="suggestions-section" style="display:none">
-      <div class="section-title" id="suggestions-title">Sugestões de corte</div>
+      <div class="section-header">
+        <div class="section-title" id="suggestions-title">Sugestões de corte</div>
+      </div>
       <div id="category-filters" class="category-filters" style="display:none"></div>
       <div id="suggestions-list" class="suggestions-list"></div>
     </div>
 
   </main>
+
+  <!-- Modal de pré-visualização de clip -->
+  <div id="preview-modal" class="preview-modal" onclick="closePreview(event)">
+    <div class="preview-modal-inner">
+      <button class="preview-close" onclick="closePreview()">&times;</button>
+      <video id="preview-video" class="preview-video" controls playsinline></video>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>

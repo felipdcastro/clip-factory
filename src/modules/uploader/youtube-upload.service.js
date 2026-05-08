@@ -3,13 +3,27 @@ const fs = require('fs');
 const { getAuthenticatedClient } = require('./youtube-auth.service');
 const logger = require('../../utils/logger').child({ module: 'uploader' });
 
-const DEFAULT_TAGS = ['política', 'MBL', 'cortes', 'brasil', 'politica brasileira'];
-const CATEGORY_NEWS_POLITICS = '25';
+const TAGS_BY_CONTENT_TYPE = {
+  'lol-esports':     ['League of Legends', 'LoL', 'esports', 'CBLOL', 'highlights', 'cortes'],
+  mbl:               ['MBL', 'Movimento Brasil Livre', 'política brasileira', 'cortes', 'Brasil'],
+  'batalha-de-rima': ['batalha de rima', 'rap', 'freestyle', 'rima', 'cortes', 'Brasil'],
+  toguro:            ['Toguro', 'Toguro live', 'stream', 'highlights', 'cortes'],
+  comedia:           ['comédia', 'stand-up', 'humor brasileiro', 'engraçado', 'cortes'],
+};
+const DEFAULT_TAGS = ['cortes', 'brasil', 'highlights'];
+
+const CATEGORY_BY_CONTENT_TYPE = {
+  'lol-esports':     '20', // Gaming
+  mbl:               '25', // News & Politics
+  'batalha-de-rima': '10', // Music
+  toguro:            '20', // Gaming
+  comedia:           '23', // Comedy
+};
 
 /**
  * Prepara metadados do vídeo para a API do YouTube
  */
-function buildVideoMetadata(title, description, type, scheduledAt) {
+function buildVideoMetadata(title, description, type, scheduledAt, tags, contentType) {
   const isReel = type === 'reel';
 
   // Shorts: adiciona #Shorts ao título e descrição
@@ -17,16 +31,24 @@ function buildVideoMetadata(title, description, type, scheduledAt) {
     ? `${title} #Shorts`
     : title;
 
-  const finalDescription = isReel
-    ? `${description || ''}\n\n#Shorts #MBL #Política`.trim()
-    : (description || '');
+  const baseDesc = description || '';
+  const finalDescription = isReel && !baseDesc.includes('#Shorts')
+    ? `${baseDesc}\n\n#Shorts`.trim()
+    : baseDesc;
+
+  // Tags: prioriza tags do argumento, depois fallback por content_type
+  const finalTags = (Array.isArray(tags) && tags.length)
+    ? tags
+    : (TAGS_BY_CONTENT_TYPE[contentType] || DEFAULT_TAGS);
+
+  const categoryId = CATEGORY_BY_CONTENT_TYPE[contentType] || '25'; // 25 = News & Politics (default)
 
   const resource = {
     snippet: {
       title: finalTitle.substring(0, 100),
       description: finalDescription,
-      tags: DEFAULT_TAGS,
-      categoryId: CATEGORY_NEWS_POLITICS,
+      tags: finalTags,
+      categoryId,
     },
     status: {
       privacyStatus: scheduledAt ? 'private' : 'public',
@@ -46,7 +68,7 @@ function buildVideoMetadata(title, description, type, scheduledAt) {
  * Faz upload de um arquivo de vídeo para o YouTube
  * Usa upload resumable (obrigatório para arquivos > 5MB)
  */
-async function uploadToYouTube(filePath, title, description, type, scheduledAt) {
+async function uploadToYouTube(filePath, title, description, type, scheduledAt, tags, contentType) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Arquivo não encontrado: ${filePath}`);
   }
@@ -55,7 +77,7 @@ async function uploadToYouTube(filePath, title, description, type, scheduledAt) 
   const youtube = google.youtube({ version: 'v3', auth });
 
   const fileSize = fs.statSync(filePath).size;
-  const resource = buildVideoMetadata(title, description, type, scheduledAt);
+  const resource = buildVideoMetadata(title, description, type, scheduledAt, tags, contentType);
 
   logger.info({ title, size_mb: parseFloat((fileSize / 1024 / 1024).toFixed(1)) }, `Iniciando upload: ${title}`);
 

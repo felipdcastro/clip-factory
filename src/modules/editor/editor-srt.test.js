@@ -5,6 +5,9 @@ jest.mock('./ffmpeg.service', () => ({
   cutClip: jest.fn().mockResolvedValue('/tmp/1_1_video.mp4'),
   buildOutputPath: jest.fn().mockReturnValue('/tmp/1_1_video.mp4'),
 }));
+jest.mock('./face-detector', () => ({
+  detectFaceCropOffset: jest.fn().mockResolvedValue(0.5),
+}));
 
 // Exporta funções privadas via require do módulo (coverage)
 // Para testar msToSrt e generateSRT precisamos chamar processClip com words reais
@@ -63,7 +66,7 @@ describe('processClip com words (SRT gerado)', () => {
 
     const result = await processClip(2);
     expect(cutClip).toHaveBeenCalledWith(
-      '/tmp/job_1.mp4', 1, 2, 10.0, 20.0, 'reel', null
+      '/tmp/job_1.mp4', 1, 2, 10.0, 20.0, 'reel', null, 0.5
     );
     expect(result.status).toBe('ready');
   });

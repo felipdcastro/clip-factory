@@ -20,7 +20,10 @@ function getAuthUrl(state) {
   const client = createOAuthClient();
   return client.generateAuthUrl({
     access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/youtube.upload'],
+    scope: [
+      'https://www.googleapis.com/auth/youtube.upload',
+      'https://www.googleapis.com/auth/youtube',
+    ],
     prompt: 'consent', // força retorno do refresh_token
     state,
   });

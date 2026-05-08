@@ -16,11 +16,14 @@ const MAX_UPLOAD_ATTEMPTS = 3;
  * Processa um upload agendado com retry automático (backoff exponencial).
  */
 async function processUpload(uploadId) {
-  // 1. Busca upload + clip
+  // 1. Busca upload + clip + job (para content_type e tags sugeridas)
   const result = await query(
-    `SELECT u.*, c.file_path, c.type as clip_type
+    `SELECT u.*, c.file_path, c.type as clip_type, j.content_type,
+            cs.suggested_tags
      FROM uploads u
      JOIN clips c ON c.id = u.clip_id
+     JOIN jobs j ON j.id = c.job_id
+     LEFT JOIN clip_suggestions cs ON cs.id = c.suggestion_id
      WHERE u.id = $1`,
     [uploadId]
   );
@@ -45,6 +48,13 @@ async function processUpload(uploadId) {
     // withRetry (maxAttempts: 3) → retenta falhas de rede dentro do worker (rápido, backoff 1s-4s)
     // BullMQ (attempts: 3 em queues/index.js) → retenta falha total do worker (lento, backoff 2s+)
     // Total máx: 9 tentativas para erros retriáveis (429, 5xx, ECONNRESET, etc.)
+    // Tags: prioriza confirmadas pelo usuário, depois sugeridas pela IA
+    const finalTags = (Array.isArray(upload.tags) && upload.tags.length)
+      ? upload.tags
+      : (Array.isArray(upload.suggested_tags) && upload.suggested_tags.length
+        ? upload.suggested_tags
+        : null);
+
     const { videoId, videoUrl } = await withRetry(
       () => limit(() =>
         uploadToYouTube(
@@ -52,7 +62,9 @@ async function processUpload(uploadId) {
           upload.title,
           upload.description,
           upload.clip_type,
-          upload.scheduled_at
+          upload.scheduled_at,
+          finalTags,
+          upload.content_type
         )
       ),
       {

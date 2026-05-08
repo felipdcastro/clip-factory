@@ -6,7 +6,7 @@ const logger = require('../utils/logger').child({ module: 'uploads-route' });
 // POST /api/uploads — agenda upload de um clip
 router.post('/', async (req, res, next) => {
   try {
-    const { clip_id, title, description, scheduled_at } = req.body;
+    const { clip_id, title, description, scheduled_at, tags } = req.body;
 
     if (!clip_id || !title) {
       return res.status(400).json({ error: 'clip_id e title são obrigatórios' });
@@ -21,11 +21,16 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Clip ainda não está pronto para upload' });
     }
 
+    // tags: valida e normaliza (array de strings, máx 500 chars total)
+    const finalTags = Array.isArray(tags) && tags.length
+      ? JSON.stringify(tags.map(t => String(t).trim()).filter(Boolean).slice(0, 15))
+      : null;
+
     // Cria o registro de upload
     const result = await query(
-      `INSERT INTO uploads (clip_id, title, description, status, scheduled_at)
-       VALUES ($1, $2, $3, 'queued', $4) RETURNING *`,
-      [clip_id, title.substring(0, 100), description || null, scheduled_at || null]
+      `INSERT INTO uploads (clip_id, title, description, tags, status, scheduled_at)
+       VALUES ($1, $2, $3, $4, 'queued', $5) RETURNING *`,
+      [clip_id, title.substring(0, 100), description || null, finalTags, scheduled_at || null]
     );
 
     const upload = result.rows[0];

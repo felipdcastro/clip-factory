@@ -10,13 +10,39 @@ jest.mock('openai', () => {
   return OpenAI;
 });
 
-const { analyzeTranscription, estimateTokens } = require('./openai.service');
+const { analyzeTranscription, calcClipsPerType, chunkByTime } = require('./openai.service');
 
-describe('estimateTokens', () => {
-  it('estima ~1 token por 4 caracteres', () => {
-    expect(estimateTokens('abcd')).toBe(1);
-    expect(estimateTokens('abcdefgh')).toBe(2);
-    expect(estimateTokens('abc')).toBe(1);
+describe('calcClipsPerType', () => {
+  it('retorna mínimo 5 para vídeos curtos', () => {
+    expect(calcClipsPerType(300)).toBe(5);
+    expect(calcClipsPerType(0)).toBe(5);
+  });
+  it('escala com a duração', () => {
+    expect(calcClipsPerType(60 * 60)).toBeGreaterThan(5); // 60min → >5
+    expect(calcClipsPerType(120 * 60)).toBeGreaterThan(10); // 120min → >10
+  });
+  it('não ultrapassa 25', () => {
+    expect(calcClipsPerType(999 * 60)).toBe(25);
+  });
+});
+
+describe('chunkByTime', () => {
+  it('retorna array vazio para words vazio', () => {
+    expect(chunkByTime([])).toEqual([]);
+  });
+  it('retorna 1 chunk para vídeo de 10 min', () => {
+    const words = Array.from({ length: 100 }, (_, i) => ({
+      text: `w${i}`, start: i * 6000, end: i * 6000 + 500,
+    })); // 100 palavras, cada 6s → ~10min
+    const chunks = chunkByTime(words);
+    expect(chunks.length).toBe(1);
+  });
+  it('retorna múltiplos chunks para vídeo de 60 min', () => {
+    const words = Array.from({ length: 600 }, (_, i) => ({
+      text: `w${i}`, start: i * 6000, end: i * 6000 + 500,
+    })); // 600 palavras, cada 6s → 60min
+    const chunks = chunkByTime(words);
+    expect(chunks.length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -41,8 +67,8 @@ describe('analyzeTranscription', () => {
     });
 
     const result = await analyzeTranscription('Texto de teste', [], 600);
-    expect(result).toHaveLength(2);
-    expect(result[0].type).toBe('video');
+    expect(result.suggestions).toHaveLength(2);
+    expect(result.suggestions[0].type).toBe('video');
   });
 
   it('lança se GPT retorna JSON inválido', async () => {
@@ -70,7 +96,7 @@ describe('analyzeTranscription', () => {
     });
 
     const result = await analyzeTranscription('texto', [], 600);
-    expect(result).toHaveLength(2); // video 2 é removida por ser duplicata
+    expect(result.suggestions).toHaveLength(2); // video 2 é removida por ser duplicata
   });
 
   it('formata texto sem words (usa texto puro)', async () => {
@@ -79,7 +105,7 @@ describe('analyzeTranscription', () => {
     });
     const result = await analyzeTranscription('Texto sem palavras', null, 600);
     expect(mockCreate).toHaveBeenCalled();
-    expect(result).toHaveLength(1);
+    expect(result.suggestions).toHaveLength(1);
   });
 
   it('formata texto com words e markers de tempo', async () => {

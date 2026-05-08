@@ -5,7 +5,7 @@ jest.mock('../../db/connection', () => ({
 
 jest.mock('./openai.service', () => ({
   analyzeTranscription: jest.fn(),
-  estimateTokens: jest.requireActual('./openai.service').estimateTokens,
+  calcClipsPerType: jest.requireActual('./openai.service').calcClipsPerType,
   VALID_CLIP_CATEGORIES: jest.requireActual('./openai.service').VALID_CLIP_CATEGORIES,
 }));
 
@@ -29,8 +29,16 @@ describe('validateSuggestion', () => {
     expect(validateSuggestion({ ...base, end_time: 25 }, 3600)).toBe(false);
   });
 
-  it('rejeita vídeo muito longo (> 12min)', () => {
-    expect(validateSuggestion({ ...base, end_time: 740 }, 3600)).toBe(false);
+  it('rejeita vídeo muito longo para vídeo curto (> 40% da duração)', () => {
+    // jobDuration=1200s (20min): maxVideo = max(720, min(480,2400)) = 720
+    // clip de 730s (>720s base) → rejeitado
+    expect(validateSuggestion({ ...base, start_time: 0, end_time: 730 }, 1200)).toBe(false);
+  });
+
+  it('aceita vídeo longo para job longo (escala com duração)', () => {
+    // jobDuration=3600s (60min): maxVideo = max(720, min(1440,2400)) = 1440
+    // clip de 730s → aceito
+    expect(validateSuggestion({ ...base, start_time: 0, end_time: 730 }, 3600)).toBe(true);
   });
 
   it('rejeita reel muito longo (> 90s)', () => {
@@ -100,7 +108,7 @@ describe('processAnalysis — lol-esports clip_category column (Story 6.2)', () 
       .mockResolvedValueOnce({ rows: [] }) // INSERT
       .mockResolvedValueOnce({ rows: [] }); // UPDATE analyzed
 
-    analyzeTranscription.mockResolvedValueOnce(mockSuggestions);
+    analyzeTranscription.mockResolvedValueOnce({ suggestions: mockSuggestions, costUsd: 0 });
 
     await processAnalysis(1);
 
@@ -121,7 +129,7 @@ describe('processAnalysis — lol-esports clip_category column (Story 6.2)', () 
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
 
-    analyzeTranscription.mockResolvedValueOnce(mockSuggestions);
+    analyzeTranscription.mockResolvedValueOnce({ suggestions: mockSuggestions, costUsd: 0 });
 
     await processAnalysis(1);
 
@@ -197,7 +205,7 @@ describe('processAnalysis', () => {
       .mockResolvedValueOnce({ rows: [] }) // INSERT suggestion 2
       .mockResolvedValueOnce({ rows: [] }); // UPDATE analyzed
 
-    analyzeTranscription.mockResolvedValueOnce(mockSuggestions);
+    analyzeTranscription.mockResolvedValueOnce({ suggestions: mockSuggestions, costUsd: 0 });
 
     const result = await processAnalysis(1);
     expect(result).toHaveLength(2);

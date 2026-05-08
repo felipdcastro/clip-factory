@@ -8,6 +8,10 @@ jest.mock('./ffmpeg.service', () => ({
   buildOutputPath: jest.fn().mockReturnValue('/tmp/1_1_video.mp4'),
 }));
 
+jest.mock('./face-detector', () => ({
+  detectFaceCropOffset: jest.fn().mockResolvedValue(0.5),
+}));
+
 const { query } = require('../../db/connection');
 const { cutClip } = require('./ffmpeg.service');
 const { processClip, getClip } = require('./editor.service');
@@ -48,7 +52,7 @@ describe('processClip', () => {
       .mockResolvedValueOnce({ rows: [] }); // UPDATE ready
 
     const result = await processClip(1);
-    expect(cutClip).toHaveBeenCalledWith('/tmp/job_1.mp4', 1, 1, 10.0, 130.0, 'video', null); // srtPath=null (sem words)
+    expect(cutClip).toHaveBeenCalledWith('/tmp/job_1.mp4', 1, 1, 10.0, 130.0, 'video', null, 0.5);
     expect(result.status).toBe('ready');
     expect(result.file_path).toBe('/tmp/1_1_video.mp4');
   });
@@ -66,6 +70,8 @@ describe('processClip', () => {
       .mockResolvedValueOnce({ rows: [{ id: 2, suggestion_id: 2, job_id: 1, type: 'reel', status: 'cutting' }] })
       .mockResolvedValueOnce({ rows: [] }); // UPDATE failed
 
+    const { detectFaceCropOffset } = require('./face-detector');
+    detectFaceCropOffset.mockResolvedValueOnce(0.5);
     cutClip.mockRejectedValueOnce(new Error('FFmpeg crashed'));
     await expect(processClip(2)).rejects.toThrow('FFmpeg crashed');
 

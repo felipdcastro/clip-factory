@@ -6,6 +6,10 @@ const rateLimit = require('express-rate-limit');
 const { createJob, createJobFromFile, getJob, listJobs } = require('../modules/downloader/job.service');
 const { getTranscription } = require('../modules/transcriber/transcription.service');
 const { getSuggestions } = require('../modules/analyzer/analyzer.service');
+const { acquireLock, releaseLock } = require('../utils/redis-lock');
+const { query } = require('../db/connection');
+const { enqueueClip, enqueueAnalysis } = require('../queues');
+const logger = require('../utils/logger').child({ module: 'jobs-route' });
 
 const jobCreateLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -18,9 +22,6 @@ const jobCreateLimiter = rateLimit({
 
 const TEMP_DIR = process.env.TEMP_DIR || './tmp';
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
-
-// Trava em memória para prevenir race condition na montagem do arquivo final
-const assemblingUploads = new Set();
 
 // Valida que uploadId não contém path traversal
 const SAFE_UPLOAD_ID = /^[a-zA-Z0-9_-]+$/;
@@ -112,11 +113,12 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
       return res.json({ received: index + 1, total });
     }
 
-    // Último chunk — verifica se já está sendo montado (race condition)
-    if (assemblingUploads.has(uploadId)) {
+    // Último chunk — lock distribuído via Redis para prevenir race condition multi-instância
+    const lockKey = `assembly:${uploadId}`;
+    const acquired = await acquireLock(lockKey, 10 * 60 * 1000); // TTL 10min (proteção contra crash)
+    if (!acquired) {
       return res.status(409).json({ error: 'Arquivo já está sendo montado. Aguarde.' });
     }
-    assemblingUploads.add(uploadId);
 
     let finalPath;
     try {
@@ -142,7 +144,7 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
       const job = await createJobFromFile(finalPath, fileName, content_type, summoner_name, riot_region);
       res.status(201).json({ job });
     } finally {
-      assemblingUploads.delete(uploadId);
+      await releaseLock(lockKey);
     }
   } catch (err) {
     // Limpa arquivo temporário do multer se não foi movido
@@ -153,10 +155,11 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
   }
 });
 
-// GET /api/jobs — lista todos os jobs
+// GET /api/jobs — lista jobs com paginação opcional (?page=1&limit=50)
 router.get('/', async (req, res, next) => {
   try {
-    const jobs = await listJobs();
+    const { page, limit } = req.query;
+    const jobs = await listJobs({ page, limit });
     res.json(jobs);
   } catch (err) {
     next(err);
@@ -206,6 +209,83 @@ router.get('/:id/suggestions', async (req, res, next) => {
 
     const suggestions = await getSuggestions(req.params.id, safeCategory);
     res.json({ job_status: job.status, suggestions });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/jobs/:id/suggestions/bulk-approve — aprova sugestões em lote
+// Query opcional: ?category=highlight|educational|funny&type=video|reel
+router.post('/:id/suggestions/bulk-approve', async (req, res, next) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    if (isNaN(jobId)) return res.status(400).json({ error: 'ID inválido' });
+
+    const job = await getJob(jobId);
+    if (!job) return res.status(404).json({ error: 'Job não encontrado' });
+
+    const VALID_CATEGORIES = ['highlight', 'educational', 'funny'];
+    const VALID_TYPES = ['video', 'reel'];
+    const { category, type } = req.query;
+
+    const safeCategory = VALID_CATEGORIES.includes(category) ? category : null;
+    const safeType = VALID_TYPES.includes(type) ? type : null;
+
+    const params = [jobId];
+    let whereExtra = '';
+    if (safeCategory) { params.push(safeCategory); whereExtra += ` AND clip_category=$${params.length}`; }
+    if (safeType)     { params.push(safeType);     whereExtra += ` AND type=$${params.length}`; }
+
+    const result = await query(
+      `UPDATE clip_suggestions SET status='approved'
+       WHERE job_id=$1 AND status='pending'${whereExtra}
+       RETURNING id`,
+      params
+    );
+
+    const approved = result.rows.map(r => r.id);
+    approved.forEach(id => {
+      enqueueClip(id).catch(err =>
+        logger.error({ err, suggestion_id: id }, 'Falha ao enfileirar clip no bulk-approve')
+      );
+    });
+
+    res.json({ approved: approved.length, suggestion_ids: approved });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/jobs/:id/reanalyze — re-executa análise GPT (com content_type opcional)
+router.post('/:id/reanalyze', async (req, res, next) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    if (isNaN(jobId)) return res.status(400).json({ error: 'ID inválido' });
+
+    const job = await getJob(jobId);
+    if (!job) return res.status(404).json({ error: 'Job não encontrado' });
+
+    const { content_type } = req.body;
+    const { VALID_CONTENT_TYPES } = require('../modules/downloader/job.service');
+
+    if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
+      return res.status(400).json({ error: `content_type inválido. Valores aceitos: ${VALID_CONTENT_TYPES.join(', ')}` });
+    }
+
+    // Atualiza content_type se fornecido e reseta status para 'transcribed'
+    if (content_type && content_type !== job.content_type) {
+      await query('UPDATE jobs SET content_type=$1 WHERE id=$2', [content_type, jobId]);
+    }
+
+    await query(
+      `UPDATE jobs SET status='transcribed', error_message=NULL, updated_at=NOW() WHERE id=$1`,
+      [jobId]
+    );
+
+    await enqueueAnalysis(jobId);
+    logger.info({ job_id: jobId, content_type: content_type || job.content_type }, 'Re-análise enfileirada');
+
+    res.json({ message: 'Re-análise iniciada', job_id: jobId, content_type: content_type || job.content_type });
   } catch (err) {
     next(err);
   }

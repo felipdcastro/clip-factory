@@ -124,6 +124,42 @@ async function getQueuesStatus() {
   return status;
 }
 
+const QUEUE_ALERT_THRESHOLDS = {
+  failed:  parseInt(process.env.QUEUE_ALERT_FAILED  || '10'),
+  waiting: parseInt(process.env.QUEUE_ALERT_WAITING || '100'),
+};
+
+let healthMonitorInterval = null;
+
+async function runQueueHealthCheck() {
+  try {
+    const status = await getQueuesStatus();
+    for (const [name, counts] of Object.entries(status)) {
+      if (counts.failed >= QUEUE_ALERT_THRESHOLDS.failed) {
+        logger.error({ queue: name, failed: counts.failed }, `ALERTA: fila "${name}" tem ${counts.failed} jobs falhos (limite: ${QUEUE_ALERT_THRESHOLDS.failed})`);
+      }
+      if (counts.waiting >= QUEUE_ALERT_THRESHOLDS.waiting) {
+        logger.warn({ queue: name, waiting: counts.waiting }, `ALERTA: fila "${name}" tem ${counts.waiting} jobs aguardando (limite: ${QUEUE_ALERT_THRESHOLDS.waiting})`);
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, 'Erro no health check das filas');
+  }
+}
+
+function startQueueHealthMonitor(intervalMs = 5 * 60 * 1000) {
+  if (healthMonitorInterval) return;
+  healthMonitorInterval = setInterval(runQueueHealthCheck, intervalMs);
+  logger.info({ interval_ms: intervalMs }, 'Queue health monitor iniciado');
+}
+
+function stopQueueHealthMonitor() {
+  if (healthMonitorInterval) {
+    clearInterval(healthMonitorInterval);
+    healthMonitorInterval = null;
+  }
+}
+
 /**
  * Fecha todas as filas e conexões graciosamente
  */
@@ -146,5 +182,7 @@ module.exports = {
   enqueueUpload,
   removeUploadJob,
   getQueuesStatus,
+  startQueueHealthMonitor,
+  stopQueueHealthMonitor,
   closeQueues,
 };
