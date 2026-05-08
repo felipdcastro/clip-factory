@@ -11,13 +11,16 @@ function startEditorWorker() {
   worker = new Worker(
     QUEUE_NAMES.EDITOR,
     async (job) => {
-      const { suggestionId } = job.data;
-      logger.info({ suggestion_id: suggestionId, bull_job_id: job.id }, `Cortando clip ${suggestionId}`);
+      const { suggestionId, correlationId } = job.data;
+      const logCtx = { suggestion_id: suggestionId, bull_job_id: job.id };
+      if (correlationId) logCtx.correlation_id = correlationId;
+      logger.info(logCtx, `Cortando clip ${suggestionId}`);
       await processClip(suggestionId);
     },
     {
       connection,
-      concurrency: 2, // máx 2 cortes simultâneos (alinhado com p-limit anterior)
+      concurrency: 1,       // 1 corte por vez: cortes demoram ~2min e são CPU-intensivos
+      lockDuration: 600000, // 10 min — FFmpeg de reel leva ~115s; default 30s expirava antes de terminar
     }
   );
 

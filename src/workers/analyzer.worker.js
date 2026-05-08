@@ -20,14 +20,23 @@ async function resetStuckJobs() {
   }
 }
 
+let stuckJobsInterval = null;
+
 function startAnalyzerWorker() {
   resetStuckJobs().catch(err => logger.error({ err }, 'Erro ao resetar jobs presos'));
+
+  stuckJobsInterval = setInterval(
+    () => resetStuckJobs().catch(err => logger.error({ err }, 'Erro ao resetar jobs presos')),
+    5 * 60 * 1000
+  );
 
   worker = new Worker(
     QUEUE_NAMES.ANALYSIS,
     async (job) => {
-      const { jobId } = job.data;
-      logger.info({ job_id: jobId, bull_job_id: job.id }, `Analisando job ${jobId}`);
+      const { jobId, correlationId } = job.data;
+      const logCtx = { job_id: jobId, bull_job_id: job.id };
+      if (correlationId) logCtx.correlation_id = correlationId;
+      logger.info(logCtx, `Analisando job ${jobId}`);
       await processAnalysis(jobId);
     },
     {
@@ -49,6 +58,7 @@ function startAnalyzerWorker() {
 }
 
 async function stopAnalyzerWorker() {
+  if (stuckJobsInterval) { clearInterval(stuckJobsInterval); stuckJobsInterval = null; }
   if (worker) {
     await worker.close();
     logger.info('Analyzer worker encerrado');

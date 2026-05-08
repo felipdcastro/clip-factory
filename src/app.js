@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const cookieSession = require('cookie-session');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const logger = require('./utils/logger').child({ module: 'app' });
 
 const healthRouter = require('./routes/health');
@@ -17,11 +18,21 @@ const costsRouter  = require('./routes/costs');
 
 const app = express();
 
+// Correlation ID — propaga X-Request-ID ou gera UUID v4 para cada requisição
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] || uuidv4();
+  req.id = requestId;
+  req.log = logger.child({ request_id: requestId });
+  res.setHeader('X-Request-ID', requestId);
+  next();
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     logger.info({
+      request_id: req.id,
       method: req.method,
       url: req.url,
       status: res.statusCode,

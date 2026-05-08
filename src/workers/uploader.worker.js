@@ -29,7 +29,7 @@ function startUploaderWorker() {
   worker = new Worker(
     QUEUE_NAMES.UPLOAD,
     async (job, token) => {
-      const { uploadId } = job.data;
+      const { uploadId, correlationId } = job.data;
 
       // Circuit breaker check — antes de consumir quota da YouTube API
       const cbState = await cb.getState();
@@ -42,7 +42,9 @@ function startUploaderWorker() {
         throw new DelayedError('Circuit breaker OPEN');
       }
 
-      logger.info({ upload_id: uploadId, bull_job_id: job.id, cb_state: cbState }, `Processando upload ${uploadId}`);
+      const logCtx = { upload_id: uploadId, bull_job_id: job.id, cb_state: cbState };
+      if (correlationId) logCtx.correlation_id = correlationId;
+      logger.info(logCtx, `Processando upload ${uploadId}`);
 
       try {
         await processUpload(uploadId);

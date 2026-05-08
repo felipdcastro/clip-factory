@@ -23,14 +23,24 @@ async function resetStuckJobs() {
   }
 }
 
+let stuckJobsInterval = null;
+
 function startTranscriptionWorker() {
   resetStuckJobs().catch(err => logger.error({ err }, 'Erro ao resetar jobs presos'));
+
+  // Roda periodicamente — não apenas no startup
+  stuckJobsInterval = setInterval(
+    () => resetStuckJobs().catch(err => logger.error({ err }, 'Erro ao resetar jobs presos')),
+    5 * 60 * 1000 // a cada 5 minutos
+  );
 
   worker = new Worker(
     QUEUE_NAMES.TRANSCRIPTION,
     async (job) => {
-      const { jobId } = job.data;
-      logger.info({ job_id: jobId, bull_job_id: job.id }, `Iniciando transcrição do job ${jobId}`);
+      const { jobId, correlationId } = job.data;
+      const logCtx = { job_id: jobId, bull_job_id: job.id };
+      if (correlationId) logCtx.correlation_id = correlationId;
+      logger.info(logCtx, `Iniciando transcrição do job ${jobId}`);
       await processTranscription(jobId);
     },
     {
@@ -52,6 +62,7 @@ function startTranscriptionWorker() {
 }
 
 async function stopTranscriptionWorker() {
+  if (stuckJobsInterval) { clearInterval(stuckJobsInterval); stuckJobsInterval = null; }
   if (worker) {
     await worker.close();
     logger.info('Transcription worker encerrado');
