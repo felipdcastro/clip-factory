@@ -3,6 +3,12 @@
 const OpenAI = require('openai');
 const logger = require('../../utils/logger').child({ module: 'seo-copywriter' });
 
+let _client = null;
+function getClient() {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _client;
+}
+
 const CONTENT_TYPE_TONE = {
   'lol-esports':     'apaixonado por esports, usa termos do jogo em inglês naturalmente, emojis de fogo e espada',
   mbl:               'direto e assertivo, tom de debate político sério, sem emojis excessivos',
@@ -40,7 +46,7 @@ RETORNE SOMENTE JSON:
 async function runSEOCopywriter({ contentType, clipTitle, clipReason, clipCategory, analystResult, videoTitle }) {
   if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurada');
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = getClient();
   const tone = CONTENT_TYPE_TONE[contentType] || 'engajante e natural';
 
   const userPrompt = `TOM DO CANAL: ${tone}
@@ -67,7 +73,12 @@ Crie o título e a descrição YouTube otimizados.`;
     ],
   });
 
-  const result = JSON.parse(response.choices[0].message.content);
+  let result;
+  try {
+    result = JSON.parse(response.choices[0].message.content);
+  } catch {
+    throw new Error('SEO Copywriter retornou JSON inválido');
+  }
   logger.info({ original_title: clipTitle, seo_title: result.title }, 'SEO Copywriter concluído');
   return result;
 }

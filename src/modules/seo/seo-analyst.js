@@ -3,6 +3,12 @@
 const OpenAI = require('openai');
 const logger = require('../../utils/logger').child({ module: 'seo-analyst' });
 
+let _client = null;
+function getClient() {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _client;
+}
+
 const CONTENT_TYPE_CONTEXT = {
   'lol-esports':     'League of Legends esports — gamers e fãs de e-sports, 16-30 anos, alta competitividade no YouTube',
   mbl:               'Política brasileira (MBL) — adultos 25-50 anos, interesse em debate político e economia',
@@ -42,7 +48,7 @@ CRITÉRIOS para seoScore (0-100):
 async function runSEOAnalyst({ contentType, clipTitle, clipReason, clipCategory, videoTitle }) {
   if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurada');
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = getClient();
   const context = CONTENT_TYPE_CONTEXT[contentType] || 'Conteúdo brasileiro — audiência geral';
 
   const userPrompt = `NICHO E AUDIÊNCIA: ${context}
@@ -64,7 +70,12 @@ Crie a estratégia de SEO ideal para este clip.`;
     ],
   });
 
-  const result = JSON.parse(response.choices[0].message.content);
+  let result;
+  try {
+    result = JSON.parse(response.choices[0].message.content);
+  } catch {
+    throw new Error('SEO Analyst retornou JSON inválido');
+  }
   logger.info({ clip_title: clipTitle, seo_score: result.seoScore }, 'SEO Analyst concluído');
   return result;
 }

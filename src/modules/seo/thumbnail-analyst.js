@@ -3,6 +3,12 @@
 const OpenAI = require('openai');
 const logger = require('../../utils/logger').child({ module: 'thumbnail-analyst' });
 
+let _client = null;
+function getClient() {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _client;
+}
+
 const SYSTEM_PROMPT = `Você é um estrategista de thumbnails do YouTube que identifica o frame mais impactante de um clip apenas pela transcrição.
 
 O MELHOR FRAME para thumbnail:
@@ -26,7 +32,7 @@ Valor deve estar entre 0 e a duração total do clip.`;
 async function runThumbnailAnalyst({ words, clipStartSec, clipEndSec, contentType, clipReason }) {
   if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurada');
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = getClient();
 
   const clipStartMs = clipStartSec * 1000;
   const clipEndMs   = clipEndSec * 1000;
@@ -67,7 +73,12 @@ Identifique o segundo ideal para o frame de thumbnail.`;
     ],
   });
 
-  const raw = JSON.parse(response.choices[0].message.content);
+  let raw;
+  try {
+    raw = JSON.parse(response.choices[0].message.content);
+  } catch {
+    raw = {};
+  }
   const offsetSec = Math.min(Math.max(0, parseFloat(raw.offsetSec) || 0), clipDuration - 0.5);
 
   logger.info({ offset_sec: offsetSec, rationale: raw.rationale }, 'Thumbnail Analyst concluído');
