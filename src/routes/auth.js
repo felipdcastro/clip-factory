@@ -48,10 +48,14 @@ router.get('/youtube/callback', async (req, res) => {
   }
 });
 
-// GET /auth/youtube/status — verifica se YouTube está autenticado
+// GET /auth/youtube/status — retorna se a integração YouTube está autenticada
 router.get('/youtube/status', async (req, res) => {
-  const authenticated = await isAuthenticated();
-  res.json({ authenticated });
+  try {
+    const authenticated = await isAuthenticated();
+    res.json({ authenticated });
+  } catch {
+    res.json({ authenticated: false });
+  }
 });
 
 // POST /auth/login

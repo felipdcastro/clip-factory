@@ -14,7 +14,8 @@ jest.mock('bullmq', () => {
     return mockWorkerInstance;
   });
   mockWorker._instance = mockWorkerInstance;
-  return { Worker: mockWorker, Queue: jest.fn().mockImplementation(() => ({ close: jest.fn() })) };
+  class DelayedError extends Error {}
+  return { Worker: mockWorker, Queue: jest.fn().mockImplementation(() => ({ close: jest.fn() })), DelayedError };
 });
 
 jest.mock('../modules/uploader/uploader.service', () => ({

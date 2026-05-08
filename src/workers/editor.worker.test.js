@@ -36,12 +36,12 @@ describe('startEditorWorker', () => {
     Object.keys(mockOnHandlers).forEach(k => delete mockOnHandlers[k]);
   });
 
-  it('cria Worker BullMQ na fila do editor com concurrency 2', () => {
+  it('cria Worker BullMQ na fila do editor com concurrency 1', () => {
     startEditorWorker();
     expect(Worker).toHaveBeenCalledWith(
       'editor',
       expect.any(Function),
-      expect.objectContaining({ concurrency: 2 })
+      expect.objectContaining({ concurrency: 1 })
     );
   });
 
