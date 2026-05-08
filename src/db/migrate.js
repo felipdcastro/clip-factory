@@ -105,6 +105,23 @@ const migrations = [
   // Story 6.5: summoner_name e riot_region na tabela jobs
   `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS summoner_name TEXT`,
   `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS riot_region TEXT DEFAULT 'BR1'`,
+
+  // Story 7.x: tags e descrição sugeridas pela IA por clip
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS suggested_tags JSONB`,
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS suggested_description TEXT`,
+
+  // Story 7.x: tags confirmadas pelo usuário no upload
+  `ALTER TABLE uploads ADD COLUMN IF NOT EXISTS tags JSONB`,
+
+  // SEO Squad: metadados otimizados por especialistas IA
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS seo_title TEXT`,
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS seo_description TEXT`,
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS seo_tags JSONB`,
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS thumbnail_offset_sec FLOAT`,
+  `ALTER TABLE clip_suggestions ADD COLUMN IF NOT EXISTS seo_score INTEGER`,
+
+  // Índice composto para listagem paginada de jobs (status + criação DESC)
+  `CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at DESC)`,
 ];
 
 async function migrate() {
