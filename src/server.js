@@ -10,7 +10,8 @@ logger.info(_dotenvResult.error
 const app = require('./app');
 const { testConnection } = require('./db/connection');
 const { migrate } = require('./db/migrate');
-const { closeQueues } = require('./queues');
+const { closeQueues, startQueueHealthMonitor, stopQueueHealthMonitor } = require('./queues');
+const { closeRedisLock } = require('./utils/redis-lock');
 const { startTranscriptionWorker, stopTranscriptionWorker } = require('./workers/transcription.worker');
 const { startAnalyzerWorker, stopAnalyzerWorker } = require('./workers/analyzer.worker');
 const { startEditorWorker, stopEditorWorker } = require('./workers/editor.worker');
@@ -36,12 +37,19 @@ async function start() {
     getKey();
     logger.info('TOKEN_ENCRYPTION_KEY configurada');
 
-    // Validação de variáveis de ambiente críticas
+    // Validação de variáveis de ambiente críticas — falha no startup se ausentes
     const missingVars = ['ASSEMBLYAI_API_KEY', 'OPENAI_API_KEY'].filter(v => !process.env[v]);
     if (missingVars.length > 0) {
-      logger.warn({ missing_vars: missingVars }, `Variáveis de ambiente não configuradas: ${missingVars.join(', ')}`);
-    } else {
-      logger.info('Variáveis de ambiente OK (AssemblyAI, OpenAI)');
+      logger.error({ missing_vars: missingVars }, `Variáveis obrigatórias não configuradas: ${missingVars.join(', ')}. Configure no .env e reinicie.`);
+      process.exit(1);
+    }
+    logger.info('Variáveis de ambiente OK (AssemblyAI, OpenAI)');
+
+    // Em produção, SESSION_SECRET default é risco de segurança
+    if (process.env.NODE_ENV === 'production' &&
+        (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'clip-factory-secret-change-me')) {
+      logger.error('SESSION_SECRET não configurada ou usa valor default inseguro. Defina uma string aleatória em .env e reinicie.');
+      process.exit(1);
     }
 
     // Inicia workers BullMQ
@@ -49,6 +57,7 @@ async function start() {
     startAnalyzerWorker();
     startEditorWorker();
     startUploaderWorker();
+    startQueueHealthMonitor();
 
     server = app.listen(PORT, () => {
       logger.info({ port: PORT }, `Clip Factory running on http://localhost:${PORT}`);
@@ -61,16 +70,30 @@ async function start() {
       // Para de aceitar novas conexões
       if (server) server.close();
 
-      // Aguarda workers finalizarem jobs em andamento
-      await Promise.all([
-        stopTranscriptionWorker(),
-        stopAnalyzerWorker(),
-        stopEditorWorker(),
-        stopUploaderWorker(),
-      ]);
+      const SHUTDOWN_TIMEOUT_MS = parseInt(process.env.SHUTDOWN_TIMEOUT_MS || '30000');
 
-      // Fecha conexões com Redis
-      await closeQueues();
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Shutdown timeout após ${SHUTDOWN_TIMEOUT_MS}ms`)), SHUTDOWN_TIMEOUT_MS)
+      );
+
+      try {
+        // Aguarda workers finalizarem jobs em andamento (com timeout)
+        stopQueueHealthMonitor();
+        await Promise.race([
+          Promise.all([
+            stopTranscriptionWorker(),
+            stopAnalyzerWorker(),
+            stopEditorWorker(),
+            stopUploaderWorker(),
+          ]),
+          timeout,
+        ]);
+      } catch (err) {
+        logger.error({ err }, 'Shutdown forçado — workers não finalizaram a tempo');
+      }
+
+      // Fecha conexões com Redis (best-effort)
+      await Promise.all([closeQueues(), closeRedisLock()]).catch(() => {});
 
       logger.info('Shutdown concluído');
       process.exit(0);

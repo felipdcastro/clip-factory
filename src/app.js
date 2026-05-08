@@ -13,6 +13,7 @@ const suggestionsRouter = require('./routes/suggestions');
 const authRouter = require('./routes/auth');
 const uploadsRouter = require('./routes/uploads');
 const queuesRouter = require('./routes/queues');
+const costsRouter  = require('./routes/costs');
 
 const app = express();
 
@@ -31,8 +32,31 @@ app.use((req, res, next) => {
 });
 
 // Security & parsing middlewares
-app.use(helmet({ contentSecurityPolicy: false })); // CSP desabilitado para assets inline no MVP
-app.use(cors());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
+app.use(cors(
+  allowedOrigins.length
+    ? { origin: (origin, cb) => (!origin || allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error('CORS: origin não permitida'))), credentials: true }
+    : undefined // sem restrição — dev/local
+));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -93,6 +117,7 @@ app.use('/api/clips', clipsRouter);
 app.use('/api/suggestions', suggestionsRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/queues', queuesRouter);
+app.use('/api/costs',  costsRouter);
 
 // 404 handler
 app.use((req, res) => {
