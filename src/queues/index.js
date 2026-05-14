@@ -8,6 +8,7 @@ const QUEUE_NAMES = {
   ANALYSIS: 'analysis',
   EDITOR: 'editor',
   UPLOAD: 'upload',
+  REMIX: 'remix',
 };
 
 // Conexão Redis compartilhada — lazy para não quebrar imports em testes
@@ -38,6 +39,7 @@ function getQueues() {
       analysis: new Queue(QUEUE_NAMES.ANALYSIS, { connection: conn }),
       editor: new Queue(QUEUE_NAMES.EDITOR, { connection: conn }),
       upload: new Queue(QUEUE_NAMES.UPLOAD, { connection: conn }),
+      remix: new Queue(QUEUE_NAMES.REMIX, { connection: conn }),
     };
   }
   return queues;
@@ -96,6 +98,19 @@ async function enqueueUpload(uploadId, scheduledAt = null) {
     backoff: { type: 'exponential', delay: 2000 },
   });
   logger.info({ upload_id: uploadId, delay_ms: delay }, `Upload ${uploadId} enfileirado`);
+}
+
+/**
+ * Adiciona remix à fila de efeitos
+ * @param {number} remixId
+ */
+async function enqueueRemix(remixId) {
+  await getQueues().remix.add('remix', { remixId }, {
+    jobId: `remix-${remixId}`,
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 2000 },
+  });
+  logger.info({ remix_id: remixId }, `Remix ${remixId} enfileirado`);
 }
 
 /**
@@ -180,6 +195,7 @@ module.exports = {
   enqueueAnalysis,
   enqueueClip,
   enqueueUpload,
+  enqueueRemix,
   removeUploadJob,
   getQueuesStatus,
   startQueueHealthMonitor,

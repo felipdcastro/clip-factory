@@ -1147,3 +1147,46 @@ main { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
 .toast-success  { background: rgba(74,222,128,0.15);  color: #4ade80; border-color: rgba(74,222,128,0.25); }
 .toast-error    { background: rgba(248,113,113,0.15); color: #f87171; border-color: rgba(248,113,113,0.25); }
 .toast-info     { background: rgba(255,255,255,0.08); color: var(--text); }
+
+
+/* ── Remix / Efeitos ─────────────────────────────────────────────────────── */
+.remix-effect-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.remix-effect-toggle:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.07); }
+.remix-effect-toggle input { display: none; }
+.remix-effect-toggle.active {
+  border-color: rgba(139,92,246,0.5);
+  background: rgba(139,92,246,0.12);
+  color: #c4b5fd;
+}
+
+.remix-clip-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.remix-clip-row:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
+.remix-clip-row.selected { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); }
+.remix-clip-title { flex: 1; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.remix-clip-meta  { font-size: 0.75rem; opacity: 0.5; white-space: nowrap; }
+.remix-clip-type  { font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.08); }
+
+.remix-actions { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
+.remix-status  { font-size: 0.85rem; opacity: 0.7; }

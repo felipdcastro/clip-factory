@@ -16,6 +16,7 @@ const { startTranscriptionWorker, stopTranscriptionWorker } = require('./workers
 const { startAnalyzerWorker, stopAnalyzerWorker } = require('./workers/analyzer.worker');
 const { startEditorWorker, stopEditorWorker } = require('./workers/editor.worker');
 const { startUploaderWorker, stopUploaderWorker } = require('./workers/uploader.worker');
+const { startRemixerWorker, stopRemixerWorker }   = require('./workers/remixer.worker');
 
 const PORT = process.env.PORT || 3000;
 let server = null;
@@ -57,6 +58,7 @@ async function start() {
     startAnalyzerWorker();
     startEditorWorker();
     startUploaderWorker();
+    startRemixerWorker();
     startQueueHealthMonitor();
 
     server = app.listen(PORT, () => {
@@ -85,6 +87,7 @@ async function start() {
             stopAnalyzerWorker(),
             stopEditorWorker(),
             stopUploaderWorker(),
+            stopRemixerWorker(),
           ]),
           timeout,
         ]);

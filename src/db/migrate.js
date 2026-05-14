@@ -122,6 +122,20 @@ const migrations = [
 
   // Índice composto para listagem paginada de jobs (status + criação DESC)
   `CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at DESC)`,
+
+  // Remix de clips — efeitos de câmera aplicados a clips existentes
+  `CREATE TABLE IF NOT EXISTS clip_remixes (
+    id              SERIAL PRIMARY KEY,
+    source_clip_id  INTEGER NOT NULL REFERENCES clips(id) ON DELETE CASCADE,
+    result_clip_id  INTEGER REFERENCES clips(id) ON DELETE SET NULL,
+    effects         JSONB NOT NULL DEFAULT '{}',
+    status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'processing', 'ready', 'failed')),
+    failure_reason  TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_clip_remixes_source ON clip_remixes(source_clip_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_clip_remixes_status ON clip_remixes(status)`,
 ];
 
 async function migrate() {

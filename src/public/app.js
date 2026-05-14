@@ -366,17 +366,30 @@ async function decideSuggestion(id, status, btn) {
   const other = btn.parentElement.querySelector(status === 'approved' ? '.btn-danger' : '.btn-success');
   if (other) other.disabled = true;
 
-  const result = await api('PATCH', `/api/suggestions/${id}`, { status });
-  if (!result) return;
+  try {
+    const result = await api('PATCH', `/api/suggestions/${id}`, { status });
+    if (!result) return;
 
-  const card = document.getElementById(`suggestion-${id}`);
-  card.className = `suggestion-card ${status}`;
+    if (result.error) {
+      showToast(result.error, 'error');
+      btn.disabled = false;
+      if (other) other.disabled = false;
+      return;
+    }
 
-  const actions = document.getElementById(`actions-${id}`);
-  actions.innerHTML = renderDecidedActions({ id, status });
+    const card = document.getElementById(`suggestion-${id}`);
+    card.className = `suggestion-card ${status}`;
 
-  if (status === 'approved') {
-    pollClipStatus(id, null);
+    const actions = document.getElementById(`actions-${id}`);
+    actions.innerHTML = renderDecidedActions({ id, status });
+
+    if (status === 'approved') {
+      pollClipStatus(id, null);
+    }
+  } catch (err) {
+    showToast('Erro ao processar decisão. Tente novamente.', 'error');
+    btn.disabled = false;
+    if (other) other.disabled = false;
   }
 }
 

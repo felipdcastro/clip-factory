@@ -183,6 +183,72 @@
       <div id="suggestions-list" class="suggestions-list"></div>
     </div>
 
+    <!-- Seção de Efeitos / Remix -->
+    <div id="remix-section" class="panel mb-24" style="margin-top:32px">
+      <div class="panel-header" style="cursor:pointer" onclick="toggleRemixSection()">
+        <div class="panel-icon">🎨</div>
+        <span class="panel-title">Efeitos de Câmera</span>
+        <span style="margin-left:8px;opacity:0.5;font-size:0.8rem">Anti-repost · Filtros · Zoom · Velocidade</span>
+        <span id="remix-chevron" style="margin-left:auto;opacity:0.5">▼</span>
+      </div>
+      <div id="remix-body" class="panel-body" style="display:none">
+
+        <!-- Seletor de efeitos -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:.08em;opacity:.5;margin-bottom:12px">Efeitos</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+            <label class="remix-effect-toggle" id="toggle-mirror">
+              <input type="checkbox" id="effect-mirror">
+              <span>↔ Espelhar (anti-repost)</span>
+            </label>
+            <label class="remix-effect-toggle" id="toggle-zoom">
+              <input type="checkbox" id="effect-zoom">
+              <span>🔍 Zoom + Pan</span>
+            </label>
+            <label class="remix-effect-toggle" id="toggle-speed">
+              <input type="checkbox" id="effect-speed">
+              <span>⚡ Velocidade 1.05×</span>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:0.85rem;opacity:.6">Filtro de cor:</span>
+            <label class="remix-effect-toggle" id="toggle-filter-none">
+              <input type="radio" name="color-filter" id="filter-none" value="" checked>
+              <span>Nenhum</span>
+            </label>
+            <label class="remix-effect-toggle" id="toggle-filter-warm">
+              <input type="radio" name="color-filter" id="filter-warm" value="warm">
+              <span>🔶 Quente</span>
+            </label>
+            <label class="remix-effect-toggle" id="toggle-filter-cold">
+              <input type="radio" name="color-filter" id="filter-cold" value="cold">
+              <span>🔷 Frio</span>
+            </label>
+            <label class="remix-effect-toggle" id="toggle-filter-vintage">
+              <input type="radio" name="color-filter" id="filter-vintage" value="vintage">
+              <span>🎞️ Vintage</span>
+            </label>
+            <label class="remix-effect-toggle" id="toggle-filter-dramatic">
+              <input type="radio" name="color-filter" id="filter-dramatic" value="dramatic">
+              <span>🎬 Dramático</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Lista de clips disponíveis -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:.08em;opacity:.5">Selecione um clip</div>
+            <button class="btn btn-ghost btn-sm" onclick="loadRemixableClips()">↺ Atualizar</button>
+          </div>
+          <div id="remix-clips-list" style="display:flex;flex-direction:column;gap:8px">
+            <div style="opacity:.5;font-size:.9rem">Carregando clips...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 
   <!-- Modal de pré-visualização de clip -->
@@ -194,5 +260,6 @@
   </div>
 
   <script src="/app.js"></script>
+  <script src="/remix-ui.js"></script>
 </body>
 </html>
