@@ -64,19 +64,33 @@ function buildVideoFilterChain(effects, type) {
 }
 
 /**
+ * Converte caminho Windows para formato aceito pelo filtro subtitles do FFmpeg.
+ * C:\path\to\file.srt → C\:/path/to/file.srt
+ */
+function toSubtitlePath(p) {
+  return p.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '$1\\:');
+}
+
+/**
  * Aplica efeitos a um clip já cortado.
  *
- * @param {string} inputPath  - Caminho do clip original (já em formato final)
- * @param {string} outputPath - Caminho do arquivo de saída
- * @param {object} effects    - { mirror, filter, zoom, speed }
+ * @param {string} inputPath    - Caminho do clip original (já em formato final)
+ * @param {string} outputPath   - Caminho do arquivo de saída
+ * @param {object} effects      - { mirror, filter, zoom, speed, subtitles }
  * @param {'reel'|'video'} type
+ * @param {string|null} srtPath - Caminho do arquivo .srt (obrigatório se effects.subtitles)
  * @returns {Promise<string>} outputPath
  */
-function applyEffects(inputPath, outputPath, effects = {}, type = 'reel') {
+function applyEffects(inputPath, outputPath, effects = {}, type = 'reel', srtPath = null) {
   const stderrLines = [];
 
   return new Promise((resolve, reject) => {
-    const vfChain = buildVideoFilterChain(effects, type);
+    let vfChain = buildVideoFilterChain(effects, type);
+
+    if (effects.subtitles && srtPath) {
+      const subtitleFilter = `subtitles='${toSubtitlePath(srtPath)}':force_style='FontName=Arial,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2'`;
+      vfChain = vfChain ? `${vfChain},${subtitleFilter}` : subtitleFilter;
+    }
 
     const outputOpts = ['-crf 22', '-preset fast', '-movflags +faststart'];
     if (vfChain) outputOpts.push(`-vf ${vfChain}`);

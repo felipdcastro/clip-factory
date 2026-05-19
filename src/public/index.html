@@ -183,6 +183,87 @@
       <div id="suggestions-list" class="suggestions-list"></div>
     </div>
 
+    <!-- Seção Studio — Upload próprio com Efeitos + Legenda -->
+    <div id="studio-section" class="panel mb-24" style="margin-top:32px">
+      <div class="panel-header" style="cursor:pointer" onclick="toggleStudioSection()">
+        <div class="panel-icon">🎬</div>
+        <span class="panel-title">Studio</span>
+        <span style="margin-left:8px;opacity:0.5;font-size:0.8rem">Upload próprio · Efeitos · Legenda PT</span>
+        <span id="studio-chevron" style="margin-left:auto;opacity:0.5">▼</span>
+      </div>
+      <div id="studio-body" class="panel-body" style="display:none">
+
+        <!-- Upload zone -->
+        <div style="margin-bottom:20px">
+          <input type="file" id="studio-file-input" accept=".mp4,.mkv,.avi,.mov,.webm" style="display:none">
+          <div class="studio-upload-zone" id="studio-upload-zone">
+            <div class="upload-zone-icon">🎥</div>
+            <div class="upload-zone-label">Clique ou arraste o vídeo aqui</div>
+            <div class="upload-zone-hint">MP4, MKV, AVI, MOV, WEBM · até 4 GB</div>
+          </div>
+          <div id="studio-file-name" class="studio-file-name"></div>
+        </div>
+
+        <!-- Efeitos -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:.08em;opacity:.5;margin-bottom:12px">Efeitos</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+            <label class="remix-effect-toggle">
+              <input type="checkbox" id="studio-effect-mirror">
+              <span>↔ Espelhar (anti-repost)</span>
+            </label>
+            <label class="remix-effect-toggle">
+              <input type="checkbox" id="studio-effect-zoom">
+              <span>🔍 Zoom + Pan</span>
+            </label>
+            <label class="remix-effect-toggle">
+              <input type="checkbox" id="studio-effect-speed">
+              <span>⚡ Velocidade 1.05×</span>
+            </label>
+            <label class="remix-effect-toggle studio-subtitle-toggle">
+              <input type="checkbox" id="studio-effect-subtitles">
+              <span>💬 Legendas PT (queimadas)</span>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:0.85rem;opacity:.6">Filtro de cor:</span>
+            <label class="remix-effect-toggle">
+              <input type="radio" name="studio-color-filter" value="" checked>
+              <span>Nenhum</span>
+            </label>
+            <label class="remix-effect-toggle">
+              <input type="radio" name="studio-color-filter" value="warm">
+              <span>🔶 Quente</span>
+            </label>
+            <label class="remix-effect-toggle">
+              <input type="radio" name="studio-color-filter" value="cold">
+              <span>🔷 Frio</span>
+            </label>
+            <label class="remix-effect-toggle">
+              <input type="radio" name="studio-color-filter" value="vintage">
+              <span>🎞️ Vintage</span>
+            </label>
+            <label class="remix-effect-toggle">
+              <input type="radio" name="studio-color-filter" value="dramatic">
+              <span>🎬 Dramático</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Botão + status -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <button class="btn btn-primary" id="studio-process-btn" style="display:none" onclick="submitStudio()">
+            🎬 Processar Vídeo
+          </button>
+          <span class="remix-status" id="studio-status-msg"></span>
+        </div>
+
+        <!-- Resultados -->
+        <div id="studio-results"></div>
+
+      </div>
+    </div>
+
     <!-- Seção de Efeitos / Remix -->
     <div id="remix-section" class="panel mb-24" style="margin-top:32px">
       <div class="panel-header" style="cursor:pointer" onclick="toggleRemixSection()">
@@ -261,5 +342,6 @@
 
   <script src="/app.js"></script>
   <script src="/remix-ui.js"></script>
+  <script src="/studio-ui.js"></script>
 </body>
 </html>

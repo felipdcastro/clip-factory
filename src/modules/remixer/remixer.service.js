@@ -2,8 +2,9 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { query }        = require('../../db/connection');
-const { applyEffects } = require('./ffmpeg-effects.service');
+const { query }             = require('../../db/connection');
+const { applyEffects }      = require('./ffmpeg-effects.service');
+const { generateSubtitles } = require('./subtitle.service');
 const logger = require('../../utils/logger').child({ module: 'remixer' });
 
 const TEMP_DIR = path.resolve(process.env.TEMP_DIR || './tmp');
@@ -73,12 +74,18 @@ async function processRemix(remixId) {
 
   const outputPath = path.join(TEMP_DIR, `remix_${remixId}_${resultClipId}_${remix.type}.mp4`);
 
+  let srtPath = null;
   try {
-    // 4. Aplica efeitos via FFmpeg
+    // 4. Aplica efeitos via FFmpeg (com legendas se solicitado)
     const effects = remix.effects || {};
     logger.info({ remix_id: remixId, effects, type: remix.type }, 'Iniciando aplicação de efeitos');
 
-    await applyEffects(remix.source_path, outputPath, effects, remix.type);
+    if (effects.subtitles) {
+      logger.info({ remix_id: remixId }, 'Gerando legendas em português');
+      srtPath = await generateSubtitles(remix.source_path, `remix_${remixId}`);
+    }
+
+    await applyEffects(remix.source_path, outputPath, effects, remix.type, srtPath);
 
     // 5. Mede duração do arquivo resultante
     const { size } = fs.statSync(outputPath);
@@ -96,12 +103,15 @@ async function processRemix(remixId) {
       [resultClipId, remixId]
     );
 
+    if (srtPath && fs.existsSync(srtPath)) fs.unlinkSync(srtPath);
     logger.info({ remix_id: remixId, result_clip_id: resultClipId }, 'Remix concluído');
     return { remixId, resultClipId, outputPath };
 
   } catch (err) {
-    // Limpa arquivo parcial se existir
-    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    // Limpa arquivos temporários — ignora EBUSY (Windows: FFmpeg ainda segurando o handle)
+    const safeUnlink = (p) => { try { if (p && fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {} };
+    safeUnlink(outputPath);
+    safeUnlink(srtPath);
 
     await query("UPDATE clips SET status='failed' WHERE id=$1", [resultClipId]);
     await query(

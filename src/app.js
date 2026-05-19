@@ -16,6 +16,7 @@ const uploadsRouter = require('./routes/uploads');
 const queuesRouter  = require('./routes/queues');
 const costsRouter   = require('./routes/costs');
 const remixesRouter = require('./routes/remixes');
+const studioRouter  = require('./routes/studio');
 
 const app = express();
 
@@ -133,6 +134,7 @@ app.use('/api/uploads', uploadsRouter);
 app.use('/api/queues',   queuesRouter);
 app.use('/api/costs',    costsRouter);
 app.use('/api/remixes',  remixesRouter);
+app.use('/api/studio',   studioRouter);
 
 // 404 handler
 app.use((req, res) => {

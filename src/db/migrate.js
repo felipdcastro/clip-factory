@@ -136,6 +136,9 @@ const migrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_clip_remixes_source ON clip_remixes(source_clip_id)`,
   `CREATE INDEX IF NOT EXISTS idx_clip_remixes_status ON clip_remixes(status)`,
+
+  // Studio — clips enviados diretamente (sem pipeline) têm job_id nulo
+  `ALTER TABLE clips ALTER COLUMN job_id DROP NOT NULL`,
 ];
 
 async function migrate() {
