@@ -7,6 +7,20 @@ function toggleStudioSection() {
   const open    = body.style.display === 'none';
   body.style.display = open ? 'block' : 'none';
   chevron.textContent = open ? '▲' : '▼';
+  if (open) loadPendingStudioResults();
+}
+
+async function loadPendingStudioResults() {
+  const container = document.getElementById('studio-results');
+  if (!container) return;
+
+  const remixes = await api('GET', '/api/remixes?source=studio');
+  if (!remixes || !remixes.length) return;
+
+  remixes.forEach(remix => {
+    if (document.getElementById('studio-result-' + remix.id)) return;
+    showStudioResult(remix);
+  });
 }
 
 (function initStudio() {

@@ -174,6 +174,19 @@
       <div id="failed-uploads-list"></div>
     </div>
 
+    <!-- Dashboard de Saúde -->
+    <div class="panel mb-24" id="health-panel">
+      <div class="panel-header" style="cursor:pointer" onclick="toggleHealthPanel()">
+        <div class="panel-icon">🩺</div>
+        <span class="panel-title">Dashboard de Saúde</span>
+        <span id="health-summary-badge" class="costs-badge"></span>
+        <span id="health-chevron" style="margin-left:auto;opacity:0.5">▼</span>
+      </div>
+      <div id="health-body" class="panel-body" style="display:none">
+        <div id="health-content">Carregando...</div>
+      </div>
+    </div>
+
     <!-- Jobs Recentes -->
     <div id="jobs-section" class="mb-24">
       <div class="section-header">
@@ -186,6 +199,10 @@
     <div id="suggestions-section" style="display:none">
       <div class="section-header">
         <div class="section-title" id="suggestions-title">Sugestões de corte</div>
+        <div id="bulk-actions" style="display:none;gap:8px;align-items:center" class="bulk-actions">
+          <button class="btn btn-success btn-sm" onclick="approveAllPending()">✓ Aprovar todos</button>
+          <span id="bulk-status" class="remix-status"></span>
+        </div>
       </div>
       <div id="category-filters" class="category-filters" style="display:none"></div>
       <div id="suggestions-list" class="suggestions-list"></div>

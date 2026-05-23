@@ -1262,3 +1262,32 @@ main { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Health Dashboard ─────────────────────────────── */
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.health-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.health-card-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  opacity: .5;
+  margin-bottom: 10px;
+}
+.health-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+}
+.health-label { opacity: .7; }
+.health-value { font-weight: 600; font-size: 0.92rem; }

@@ -264,6 +264,15 @@ async function loadSuggestions(jobId, category) {
     suggestions.forEach(s => list.appendChild(buildSuggestionCard(s)));
   }
 
+  // Mostrar botão "Aprovar todos" se houver sugestões pendentes
+  const pendingCount = suggestions.filter(s => s.status === 'pending').length;
+  const bulkEl = document.getElementById('bulk-actions');
+  if (bulkEl) {
+    bulkEl.style.display = pendingCount > 1 ? 'flex' : 'none';
+    const btn = bulkEl.querySelector('button');
+    if (btn) btn.textContent = `✓ Aprovar todos (${pendingCount})`;
+  }
+
   section.style.display = 'block';
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -405,6 +414,30 @@ async function decideSuggestion(id, status, btn) {
     btn.disabled = false;
     if (other) other.disabled = false;
   }
+}
+
+// ── Aprovação em lote ──────────────────────────────────────────────────────
+
+// eslint-disable-next-line no-unused-vars
+async function approveAllPending() {
+  const pendingBtns = document.querySelectorAll('#suggestions-list .btn-success:not(:disabled)');
+  if (!pendingBtns.length) return;
+
+  const bulkBtn    = document.querySelector('#bulk-actions button');
+  const bulkStatus = document.getElementById('bulk-status');
+  if (bulkBtn) bulkBtn.disabled = true;
+
+  let done = 0;
+  for (const btn of pendingBtns) {
+    if (bulkStatus) bulkStatus.textContent = `Aprovando ${done + 1}/${pendingBtns.length}...`;
+    btn.click();
+    await new Promise(r => setTimeout(r, 600)); // pequeno delay entre aprovações
+    done++;
+  }
+
+  if (bulkStatus) bulkStatus.textContent = `${done} aprovados!`;
+  if (bulkBtn) bulkBtn.style.display = 'none';
+  setTimeout(() => { if (bulkStatus) bulkStatus.textContent = ''; }, 3000);
 }
 
 // ── Poll clip ──────────────────────────────────────────────────────────────
@@ -777,6 +810,72 @@ async function retryUpload(uploadId, btn) {
     btn.disabled = false;
     btn.textContent = '↺ Tentar novamente';
   }
+}
+
+// ── Dashboard de Saúde ────────────────────────────────────────────────────
+
+// eslint-disable-next-line no-unused-vars
+function toggleHealthPanel() {
+  const body    = document.getElementById('health-body');
+  const chevron = document.getElementById('health-chevron');
+  const open    = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  chevron.textContent = open ? '▲' : '▼';
+  if (open) loadHealthDashboard();
+}
+
+async function loadHealthDashboard() {
+  const container = document.getElementById('health-content');
+  if (!container) return;
+
+  const data = await api('GET', '/api/health-dashboard');
+  if (!data) { container.innerHTML = '<span style="opacity:.5">Erro ao carregar</span>'; return; }
+
+  const ytColor = data.youtube.status === 'connected' ? '#4ade80' : '#f87171';
+  const tmpWarn = data.tmp_size_mb > 500;
+  const tmpColor = tmpWarn ? '#f87171' : '#4ade80';
+
+  const failedUploads = data.uploads.failed || 0;
+  const badge = document.getElementById('health-summary-badge');
+  if (badge) {
+    const alerts = failedUploads + (data.summary.clips_sem_upload > 10 ? 1 : 0) + (tmpWarn ? 1 : 0);
+    badge.textContent = alerts ? `${alerts} alerta${alerts > 1 ? 's' : ''}` : 'OK';
+    badge.style.background = alerts ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)';
+    badge.style.color = alerts ? '#f87171' : '#4ade80';
+  }
+
+  const statusRow = (label, value, color) =>
+    `<div class="health-row"><span class="health-label">${esc(label)}</span><span class="health-value" style="color:${color}">${esc(String(value))}</span></div>`;
+
+  const jobsTotal  = Object.values(data.jobs).reduce((a, b) => a + b, 0);
+  const clipsTotal = Object.values(data.clips).reduce((a, b) => a + b, 0);
+
+  container.innerHTML = `
+    <div class="health-grid">
+      <div class="health-card">
+        <div class="health-card-title">Sistema</div>
+        ${statusRow('YouTube', data.youtube.status, ytColor)}
+        ${statusRow('tmp/ em disco', data.tmp_size_mb + ' MB', tmpColor)}
+      </div>
+      <div class="health-card">
+        <div class="health-card-title">Jobs (${jobsTotal})</div>
+        ${statusRow('Analisados', data.jobs.analyzed || 0, '#4ade80')}
+        ${statusRow('Em andamento', (data.jobs.downloading || 0) + (data.jobs.transcribing || 0) + (data.jobs.analyzing || 0), '#c9a227')}
+        ${statusRow('Falharam', data.jobs.failed || 0, data.jobs.failed ? '#f87171' : '#888')}
+      </div>
+      <div class="health-card">
+        <div class="health-card-title">Clips (${clipsTotal})</div>
+        ${statusRow('Prontos', data.clips.ready || 0, '#4ade80')}
+        ${statusRow('Sem upload', data.summary.clips_sem_upload, data.summary.clips_sem_upload > 10 ? '#f87171' : '#888')}
+      </div>
+      <div class="health-card">
+        <div class="health-card-title">Uploads</div>
+        ${statusRow('Na fila', data.summary.uploads_na_fila, '#c9a227')}
+        ${statusRow('Próx. 24h', data.summary.uploads_proximas_24h, '#c4b5fd')}
+        ${statusRow('Falharam', failedUploads, failedUploads ? '#f87171' : '#888')}
+      </div>
+    </div>
+  `;
 }
 
 // Carrega jobs ao abrir a página

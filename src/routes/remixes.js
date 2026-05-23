@@ -57,9 +57,25 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// GET /api/remixes — lista todos os remixes
+// GET /api/remixes — lista remixes (opcional: ?source=studio para apenas uploads diretos prontos)
 router.get('/', async (req, res, next) => {
   try {
+    if (req.query.source === 'studio') {
+      // Remixes prontos vindos do Studio (job_id IS NULL) sem upload agendado
+      const result = await query(
+        `SELECT r.*, c.type
+         FROM clip_remixes r
+         JOIN clips c ON c.id = r.source_clip_id
+         WHERE r.status = 'ready'
+           AND c.job_id IS NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM uploads u WHERE u.clip_id = r.result_clip_id
+           )
+         ORDER BY r.created_at DESC
+         LIMIT 20`
+      );
+      return res.json(result.rows);
+    }
     const remixes = await listRemixes(100);
     res.json(remixes);
   } catch (err) {
