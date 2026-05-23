@@ -53,10 +53,10 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// GET /api/uploads — lista todos os uploads
+// GET /api/uploads — lista uploads (opcional: ?status=failed)
 router.get('/', async (req, res, next) => {
   try {
-    const uploads = await listUploads();
+    const uploads = await listUploads(req.query.status || null);
     res.json(uploads);
   } catch (err) {
     next(err);

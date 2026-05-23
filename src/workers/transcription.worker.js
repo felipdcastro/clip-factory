@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const { Worker } = require('bullmq');
 const { query } = require('../db/connection');
 const { processTranscription } = require('../modules/transcriber/transcription.service');
@@ -9,9 +10,31 @@ const logger = require('../utils/logger').child({ module: 'transcription-worker'
 let worker = null;
 
 /**
+ * Marca como failed jobs cujo arquivo de vídeo não existe mais no disco.
+ * Evita loop infinito de reset → transcribing → reset.
+ */
+async function failJobsWithMissingFiles() {
+  const result = await query(
+    `SELECT id, file_path FROM jobs WHERE status IN ('downloaded','transcribing') AND file_path IS NOT NULL`
+  );
+  const missing = result.rows.filter(r => !fs.existsSync(r.file_path));
+  if (!missing.length) return;
+
+  const ids = missing.map(r => r.id);
+  await query(
+    `UPDATE jobs SET status='failed', error_message='Arquivo de vídeo não encontrado no disco', updated_at=NOW()
+     WHERE id = ANY($1)`,
+    [ids]
+  );
+  logger.warn({ job_ids: ids }, `${ids.length} job(s) marcados como failed (arquivo ausente)`);
+}
+
+/**
  * Reseta jobs presos em 'transcribing' há mais de 10 minutos de volta para 'downloaded'
  */
 async function resetStuckJobs() {
+  await failJobsWithMissingFiles();
+
   const result = await query(
     `UPDATE jobs SET status='downloaded', error_message=NULL, updated_at=NOW()
      WHERE status='transcribing'

@@ -12,10 +12,10 @@ async function checkYouTubeStatus() {
   if (!data) return;
 
   const STATES = {
-    connected:      { label: 'YouTube',        cls: 'connected',      href: null },
-    expired:        { label: 'Token expirado',  cls: 'expired',        href: '/auth/youtube' },
-    disconnected:   { label: 'Conectar YouTube', cls: 'disconnected',  href: '/auth/youtube' },
-    not_configured: { label: 'YT não config.',  cls: 'not-configured', href: null },
+    connected:      { label: 'YouTube',          cls: 'connected',      href: null },
+    expired:        { label: '⚠ Token expirado', cls: 'expired',        href: '/auth/youtube' },
+    disconnected:   { label: 'Conectar YouTube', cls: 'disconnected',   href: '/auth/youtube' },
+    not_configured: { label: 'YT não config.',   cls: 'not-configured', href: null },
   };
 
   const cfg = STATES[data.status] || STATES.disconnected;
@@ -23,6 +23,20 @@ async function checkYouTubeStatus() {
   el.innerHTML = cfg.href
     ? `<a href="${cfg.href}" class="yt-status-link"><span class="yt-dot"></span>${cfg.label}</a>`
     : `<span class="yt-dot"></span>${cfg.label}`;
+
+  // Banner de alerta persistente quando token expirado
+  const existingBanner = document.getElementById('yt-expired-banner');
+  if (data.status === 'expired' || data.status === 'disconnected') {
+    if (!existingBanner) {
+      const banner = document.createElement('div');
+      banner.id = 'yt-expired-banner';
+      banner.className = 'yt-expired-banner';
+      banner.innerHTML = '⚠️ Token do YouTube expirado — uploads pausados. <a href="/auth/youtube">Reautenticar agora</a>';
+      document.querySelector('main').prepend(banner);
+    }
+  } else if (existingBanner) {
+    existingBanner.remove();
+  }
 }
 
 function showToast(msg, type = 'info') {
@@ -725,8 +739,49 @@ async function loadRecentJobs() {
   });
 }
 
+// ── Uploads com falha ─────────────────────────────────────────────────────
+
+async function loadFailedUploads() {
+  const data = await api('GET', '/api/uploads?status=failed');
+  if (!data || !data.length) return;
+
+  const section = document.getElementById('failed-uploads-section');
+  const list    = document.getElementById('failed-uploads-list');
+  section.style.display = 'block';
+  list.innerHTML = '';
+
+  data.forEach(u => {
+    const row = document.createElement('div');
+    row.className = 'failed-upload-row';
+    row.id = `failed-upload-${u.id}`;
+    row.innerHTML =
+      `<span class="failed-upload-title" title="${esc(u.title || '')}">${esc((u.title || 'Sem título').substring(0, 55))}</span>` +
+      `<span class="failed-upload-reason">${esc((u.failure_reason || '').substring(0, 80))}</span>` +
+      `<button class="btn btn-ghost btn-sm" onclick="retryUpload(${u.id}, this)">↺ Tentar novamente</button>`;
+    list.appendChild(row);
+  });
+}
+
+// eslint-disable-next-line no-unused-vars
+async function retryUpload(uploadId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Reenviando...';
+  const result = await api('POST', `/api/uploads/${uploadId}/retry`);
+  if (result && !result.error) {
+    showToast('Upload re-enfileirado!', 'success');
+    document.getElementById(`failed-upload-${uploadId}`)?.remove();
+    const remaining = document.querySelectorAll('[id^="failed-upload-"]');
+    if (!remaining.length) document.getElementById('failed-uploads-section').style.display = 'none';
+  } else {
+    showToast(result?.error || 'Erro ao re-enfileirar', 'error');
+    btn.disabled = false;
+    btn.textContent = '↺ Tentar novamente';
+  }
+}
+
 // Carrega jobs ao abrir a página
 loadRecentJobs();
+loadFailedUploads();
 
 document.getElementById('url-form').addEventListener('submit', async (e) => {
   e.preventDefault();

@@ -141,7 +141,11 @@ async function getUpload(uploadId) {
   return result.rows[0] || null;
 }
 
-async function listUploads() {
+async function listUploads(status = null) {
+  if (status) {
+    const result = await query('SELECT * FROM uploads WHERE status=$1 ORDER BY created_at DESC LIMIT 50', [status]);
+    return result.rows;
+  }
   const result = await query('SELECT * FROM uploads ORDER BY created_at DESC LIMIT 50');
   return result.rows;
 }

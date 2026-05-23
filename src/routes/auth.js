@@ -48,13 +48,24 @@ router.get('/youtube/callback', async (req, res) => {
   }
 });
 
-// GET /auth/youtube/status — retorna se a integração YouTube está autenticada
+// GET /auth/youtube/status — retorna estado detalhado da integração YouTube
 router.get('/youtube/status', async (req, res) => {
   try {
-    const authenticated = await isAuthenticated();
-    res.json({ authenticated });
+    const { query } = require('../db/connection');
+    const result = await query("SELECT auth_status, expires_at FROM oauth_tokens WHERE provider='youtube' ORDER BY updated_at DESC LIMIT 1");
+    if (!result.rows.length) return res.json({ status: 'disconnected' });
+
+    const row = result.rows[0];
+    if (row.auth_status === 'expired') return res.json({ status: 'expired' });
+
+    // Verifica se token expira em menos de 3 dias (access_token só dura 1h mas refresh_token pode ter sido revogado)
+    const expiresAt = row.expires_at ? new Date(row.expires_at) : null;
+    res.json({
+      status: 'connected',
+      expires_at: expiresAt,
+    });
   } catch {
-    res.json({ authenticated: false });
+    res.json({ status: 'disconnected' });
   }
 });
 

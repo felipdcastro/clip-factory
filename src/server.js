@@ -17,6 +17,7 @@ const { startAnalyzerWorker, stopAnalyzerWorker } = require('./workers/analyzer.
 const { startEditorWorker, stopEditorWorker } = require('./workers/editor.worker');
 const { startUploaderWorker, stopUploaderWorker } = require('./workers/uploader.worker');
 const { startRemixerWorker, stopRemixerWorker }   = require('./workers/remixer.worker');
+const { startCleanup, stopCleanup }               = require('./utils/tmp-cleanup');
 
 const PORT = process.env.PORT || 3000;
 let server = null;
@@ -59,6 +60,7 @@ async function start() {
     startEditorWorker();
     startUploaderWorker();
     startRemixerWorker();
+    startCleanup();
     startQueueHealthMonitor();
 
     server = app.listen(PORT, () => {
@@ -81,6 +83,7 @@ async function start() {
       try {
         // Aguarda workers finalizarem jobs em andamento (com timeout)
         stopQueueHealthMonitor();
+        stopCleanup();
         await Promise.race([
           Promise.all([
             stopTranscriptionWorker(),
