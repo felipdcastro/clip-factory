@@ -22,7 +22,7 @@ async function processUpload(uploadId) {
             cs.suggested_tags
      FROM uploads u
      JOIN clips c ON c.id = u.clip_id
-     JOIN jobs j ON j.id = c.job_id
+     LEFT JOIN jobs j ON j.id = c.job_id
      LEFT JOIN clip_suggestions cs ON cs.id = c.suggestion_id
      WHERE u.id = $1`,
     [uploadId]
