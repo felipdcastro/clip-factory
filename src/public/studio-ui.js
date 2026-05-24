@@ -1,3 +1,5 @@
+/* global api, showToast */
+
 // ── Studio — Upload próprio com Efeitos + Legenda ─────────────────────────
 
 // eslint-disable-next-line no-unused-vars
@@ -26,7 +28,6 @@ async function loadPendingStudioResults() {
 (function initStudio() {
   const zone     = document.getElementById('studio-upload-zone');
   const fileInput= document.getElementById('studio-file-input');
-  const nameEl   = document.getElementById('studio-file-name');
   if (!zone || !fileInput) return;
 
   zone.addEventListener('click', () => fileInput.click());
@@ -113,7 +114,7 @@ async function submitStudio() {
     statusEl.textContent = hasSubtitles ? 'Transcrevendo legenda...' : 'Processando...';
 
     pollStudioStatus(data.remix_id, btn, statusEl, hasSubtitles);
-  } catch (e) {
+  } catch {
     showToast('Erro ao enviar vídeo', 'error');
     btn.disabled = false;
     statusEl.textContent = '';

@@ -233,7 +233,6 @@ async function loadSuggestions(jobId, category) {
     ? `/api/jobs/${jobId}/suggestions?category=${encodeURIComponent(category)}`
     : `/api/jobs/${jobId}/suggestions`;
   const data = await api('GET', url);
-  // eslint-disable-next-line no-console
   console.log('[loadSuggestions] data:', data);
   if (!data || !data.suggestions) return;
 
@@ -275,7 +274,6 @@ async function loadSuggestions(jobId, category) {
 
   section.style.display = 'block';
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('[loadSuggestions] erro:', err);
   }
 }
@@ -409,7 +407,7 @@ async function decideSuggestion(id, status, btn) {
     if (status === 'approved') {
       pollClipStatus(id, null);
     }
-  } catch (err) {
+  } catch {
     showToast('Erro ao processar decisão. Tente novamente.', 'error');
     btn.disabled = false;
     if (other) other.disabled = false;
@@ -554,7 +552,6 @@ function openPreview(clipId) {
   video.play().catch(() => {});
 }
 
-// eslint-disable-next-line no-unused-vars
 function closePreview(e) {
   if (e && e.target !== document.getElementById('preview-modal') && !e.target.classList.contains('preview-close')) return;
   const modal = document.getElementById('preview-modal');
@@ -973,6 +970,7 @@ async function runSEO(suggestionId, btn) {
 // ── Painel de Custos ──────────────────────────────────────────────────────
 let costsLoaded = false;
 
+// eslint-disable-next-line no-unused-vars
 function toggleCosts() {
   const body    = document.getElementById('costs-body');
   const chevron = document.getElementById('costs-chevron');
@@ -992,14 +990,6 @@ async function loadCosts() {
     badge.textContent = `$${d.combined.month.toFixed(4)} este mês`;
 
     const fmtUsd = v => `$${parseFloat(v).toFixed(4)}`;
-    const bar = (label, val, total) => {
-      const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-      return `<div class="cost-bar-wrap">
-        <span class="cost-bar-label">${label}</span>
-        <div class="cost-bar-track"><div class="cost-bar-fill" style="width:${pct}%"></div></div>
-        <span class="cost-bar-value">${fmtUsd(val)}</span>
-      </div>`;
-    };
 
     const periods = [
       ['Hoje',       d.combined.today, d.assemblyai.today, d.openai.today],

@@ -13,7 +13,7 @@ function dirSizeMb(dir) {
     const files = fs.readdirSync(dir);
     let total = 0;
     for (const f of files) {
-      try { total += fs.statSync(path.join(dir, f)).size; } catch (_) {}
+      try { total += fs.statSync(path.join(dir, f)).size; } catch { /* arquivo inacessível */ }
     }
     return parseFloat((total / 1024 / 1024).toFixed(1));
   } catch { return 0; }

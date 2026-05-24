@@ -392,19 +392,19 @@ describe('GET /auth/youtube/callback (autenticado)', () => {
 describe('GET /auth/youtube/status (autenticado)', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('retorna authenticated=true quando token válido', async () => {
+  it('retorna status=connected quando token válido', async () => {
     const agent = await makeAuthAgent();
-    isAuthenticated.mockResolvedValueOnce(true);
+    query.mockResolvedValueOnce({ rows: [{ auth_status: 'active', expires_at: new Date() }] });
     const res = await agent.get('/auth/youtube/status');
     expect(res.status).toBe(200);
-    expect(res.body.authenticated).toBe(true);
+    expect(res.body.status).toBe('connected');
   });
 
-  it('retorna authenticated=false quando sem token', async () => {
+  it('retorna status=disconnected quando sem token', async () => {
     const agent = await makeAuthAgent();
-    isAuthenticated.mockResolvedValueOnce(false);
+    query.mockResolvedValueOnce({ rows: [] });
     const res = await agent.get('/auth/youtube/status');
     expect(res.status).toBe(200);
-    expect(res.body.authenticated).toBe(false);
+    expect(res.body.status).toBe('disconnected');
   });
 });

@@ -1,3 +1,4 @@
+/* global api, esc, showToast */
 
 // ── Remix / Efeitos de Câmera ──────────────────────────────────────────────
 
@@ -48,7 +49,6 @@ function fmtMs(ms) {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 
-// eslint-disable-next-line no-unused-vars
 async function loadRemixableClips() {
   const list = document.getElementById('remix-clips-list');
   list.innerHTML = '<div style="opacity:.5;font-size:.9rem">Carregando...</div>';
@@ -124,7 +124,7 @@ async function submitRemix() {
     showToast('Remix enfileirado! Processando...', 'info');
     statusEl.textContent = 'Processando...';
     pollRemixStatus(remix.id, btn, statusEl);
-  } catch(e) {
+  } catch {
     showToast('Erro ao criar remix', 'error');
     btn.disabled = false;
     statusEl.textContent = '';

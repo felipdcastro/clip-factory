@@ -37,7 +37,7 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
 
-  let effectsRaw = {};
+  let effectsRaw;
   try {
     effectsRaw = req.body.effects ? JSON.parse(req.body.effects) : {};
   } catch {

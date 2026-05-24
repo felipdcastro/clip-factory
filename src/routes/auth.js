@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const router = require('express').Router();
-const { getAuthUrl, exchangeCodeForTokens, isAuthenticated } = require('../modules/uploader/youtube-auth.service');
+const { getAuthUrl, exchangeCodeForTokens } = require('../modules/uploader/youtube-auth.service');
 const logger = require('../utils/logger').child({ module: 'auth' });
 
 /**

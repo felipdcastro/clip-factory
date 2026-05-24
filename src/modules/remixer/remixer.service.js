@@ -109,7 +109,7 @@ async function processRemix(remixId) {
 
   } catch (err) {
     // Limpa arquivos temporários — ignora EBUSY (Windows: FFmpeg ainda segurando o handle)
-    const safeUnlink = (p) => { try { if (p && fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {} };
+    const safeUnlink = (p) => { try { if (p && fs.existsSync(p)) fs.unlinkSync(p); } catch { /* EBUSY — FFmpeg ainda segura o handle */ } };
     safeUnlink(outputPath);
     safeUnlink(srtPath);
 
