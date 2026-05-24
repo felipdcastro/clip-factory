@@ -92,7 +92,7 @@ function applyEffects(inputPath, outputPath, effects = {}, type = 'reel', srtPat
       vfChain = vfChain ? `${vfChain},${subtitleFilter}` : subtitleFilter;
     }
 
-    const outputOpts = ['-crf 22', '-preset fast', '-movflags +faststart'];
+    const outputOpts = ['-crf 23', '-preset ultrafast', '-movflags +faststart'];
     if (vfChain) outputOpts.push(`-vf ${vfChain}`);
 
     const cmd = ffmpeg(toFfmpegPath(inputPath))
