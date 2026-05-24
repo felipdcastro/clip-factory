@@ -75,7 +75,7 @@ const { getTranscription } = require('../modules/transcriber/transcription.servi
 const { getSuggestions } = require('../modules/analyzer/analyzer.service');
 const { listUploads, getUpload } = require('../modules/uploader/uploader.service');
 const { enqueueUpload } = require('../queues');
-const { getAuthUrl, exchangeCodeForTokens, isAuthenticated } = require('../modules/uploader/youtube-auth.service');
+const { getAuthUrl, exchangeCodeForTokens } = require('../modules/uploader/youtube-auth.service');
 const app = require('../app');
 
 // Helper: cria agente autenticado

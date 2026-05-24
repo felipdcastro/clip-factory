@@ -875,9 +875,56 @@ async function loadHealthDashboard() {
   `;
 }
 
+// ── Auto-refresh ──────────────────────────────────────────────────────────
+
+const REFRESH_FAST_MS  = 10_000; // 10s — quando há jobs em andamento
+const REFRESH_SLOW_MS  = 30_000; // 30s — estado estável
+
+let _refreshTimer = null;
+
+function hasActiveJobs() {
+  const rows = document.querySelectorAll('.job-row');
+  for (const r of rows) {
+    const badge = r.querySelector('.job-status-badge');
+    if (!badge) continue;
+    const label = badge.textContent.trim();
+    const active = ['Pendente','Baixando','Baixado','Transcrevendo','Transcrito','Analisando'];
+    if (active.some(a => label.includes(a))) return true;
+  }
+  return false;
+}
+
+async function refreshDashboard() {
+  await loadRecentJobs();
+  await loadFailedUploads();
+
+  const healthBody = document.getElementById('health-body');
+  if (healthBody && healthBody.style.display !== 'none') {
+    await loadHealthDashboard();
+  }
+
+  const delay = hasActiveJobs() ? REFRESH_FAST_MS : REFRESH_SLOW_MS;
+  _refreshTimer = setTimeout(refreshDashboard, delay);
+}
+
+function startAutoRefresh() {
+  if (_refreshTimer) clearTimeout(_refreshTimer);
+  _refreshTimer = setTimeout(refreshDashboard, REFRESH_FAST_MS);
+}
+
+function stopAutoRefresh() {
+  if (_refreshTimer) { clearTimeout(_refreshTimer); _refreshTimer = null; }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopAutoRefresh();
+  else startAutoRefresh();
+});
+
 // Carrega jobs ao abrir a página
 loadRecentJobs();
 loadFailedUploads();
+startAutoRefresh();
 
 document.getElementById('url-form').addEventListener('submit', async (e) => {
   e.preventDefault();
