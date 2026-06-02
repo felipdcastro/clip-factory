@@ -58,6 +58,9 @@
             <button class="btn-content-type" data-type="sinuca">
               <span class="ct-icon">🎱</span> Sinuca
             </button>
+            <button class="btn-content-type" data-type="skills-desafios">
+              <span class="ct-icon">🏅</span> Skills & Desafios
+            </button>
           </div>
         </div>
 
@@ -170,6 +173,7 @@
     <div id="failed-uploads-section" class="mb-24" style="display:none">
       <div class="section-header">
         <div class="section-title" style="color:#f87171">⚠ Uploads com falha</div>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto;color:#f87171" onclick="purgeFailedUploads(this)">🗑 Limpar erros</button>
       </div>
       <div id="failed-uploads-list"></div>
     </div>

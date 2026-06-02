@@ -17,6 +17,7 @@ const CONTENT_TYPE_CONTEXT = {
   sinuca:            'Sinuca brasileira — apreciadores de bilhar/snooker, 25-55 anos, nicho específico',
   'batalha-de-rima': 'Batalha de rima / rap nacional — fãs de hip-hop e freestyle, 16-35 anos',
   'slap-battles':    'Slap battles / batalha de tapa — fãs de esportes extremos e viral, 16-30 anos',
+  'skills-desafios': 'Habilidades esportivas e desafios — fãs de esportes e viral, 14-35 anos, alto potencial de Shorts',
 };
 
 const SYSTEM_PROMPT = `Você é um especialista em SEO para YouTube com histórico comprovado de crescimento orgânico de canais.

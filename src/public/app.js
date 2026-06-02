@@ -787,9 +787,41 @@ async function loadFailedUploads() {
     row.innerHTML =
       `<span class="failed-upload-title" title="${esc(u.title || '')}">${esc((u.title || 'Sem título').substring(0, 55))}</span>` +
       `<span class="failed-upload-reason">${esc((u.failure_reason || '').substring(0, 80))}</span>` +
-      `<button class="btn btn-ghost btn-sm" onclick="retryUpload(${u.id}, this)">↺ Tentar novamente</button>`;
+      `<button class="btn btn-ghost btn-sm" onclick="retryUpload(${u.id}, this)">↺ Tentar novamente</button>` +
+      `<button class="btn btn-ghost btn-sm" style="color:#f87171;margin-left:4px" onclick="deleteFailedUpload(${u.id}, this)" title="Excluir">✕</button>`;
     list.appendChild(row);
   });
+}
+
+// eslint-disable-next-line no-unused-vars
+async function deleteFailedUpload(uploadId, btn) {
+  btn.disabled = true;
+  const result = await api('DELETE', `/api/uploads/${uploadId}`);
+  if (result && !result.error) {
+    const row = document.getElementById(`failed-upload-${uploadId}`);
+    row?.remove();
+    const remaining = document.querySelectorAll('[id^="failed-upload-"]');
+    if (!remaining.length) document.getElementById('failed-uploads-section').style.display = 'none';
+  } else {
+    showToast(result?.error || 'Erro ao excluir', 'error');
+    btn.disabled = false;
+  }
+}
+
+// eslint-disable-next-line no-unused-vars
+async function purgeFailedUploads(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Excluindo...';
+  const result = await api('DELETE', '/api/uploads/failed');
+  if (result && !result.error) {
+    showToast(`${result.deleted} upload(s) excluído(s)`, 'success');
+    document.getElementById('failed-uploads-list').innerHTML = '';
+    document.getElementById('failed-uploads-section').style.display = 'none';
+  } else {
+    showToast(result?.error || 'Erro ao excluir', 'error');
+    btn.disabled = false;
+    btn.textContent = '🗑 Limpar erros';
+  }
 }
 
 // eslint-disable-next-line no-unused-vars

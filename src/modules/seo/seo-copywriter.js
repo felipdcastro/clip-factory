@@ -17,6 +17,7 @@ const CONTENT_TYPE_TONE = {
   sinuca:            'entusiasmado mas respeitoso com o esporte, emojis de bola de sinuca',
   'batalha-de-rima': 'linguagem do nicho hip-hop, usa gírias do rap, emojis de microfone e fogo',
   'slap-battles':    'impactante e hype, reação exagerada, emojis de choque e explosão, viral',
+  'skills-desafios': 'empolgante e admirado, destaca a dificuldade e a habilidade, emojis de fogo e troféu, linguagem viral',
 };
 
 const SYSTEM_PROMPT = `Você é um copywriter especializado em YouTube com histórico de títulos com CTR acima de 8%.

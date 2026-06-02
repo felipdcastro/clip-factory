@@ -8,6 +8,7 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const TEMP_DIR = path.resolve(process.env.TEMP_DIR || './tmp');
 const FFMPEG_TIMEOUT_MS = parseInt(process.env.FFMPEG_TIMEOUT_MS || '1800000'); // 30 min
+const FFMPEG_CRF = parseInt(process.env.FFMPEG_CRF || '18');
 
 function toFfmpegPath(p) {
   return p ? p.replace(/\\/g, '/') : p;
@@ -35,7 +36,7 @@ function cutVideoHorizontal(inputPath, outputPath, startTime, endTime, assPath) 
       .duration(endTime - startTime)
       .videoCodec('libx264')
       .audioCodec('aac')
-      .outputOptions(['-crf 22', '-preset fast', `-vf ${vf}`, '-movflags +faststart'])
+      .outputOptions([`-crf ${FFMPEG_CRF}`, '-preset fast', `-vf ${vf}`, '-movflags +faststart'])
       .output(toFfmpegPath(outputPath))
       .on('stderr', (line) => stderrLines.push(line))
       .on('end', () => { clearTimeout(timer); resolve(outputPath); })
@@ -70,7 +71,7 @@ function cutVideoVertical(inputPath, outputPath, startTime, endTime, assPath, cr
       .duration(endTime - startTime)
       .videoCodec('libx264')
       .audioCodec('aac')
-      .outputOptions(['-crf 22', '-preset fast', `-vf ${vf}`, '-movflags +faststart'])
+      .outputOptions([`-crf ${FFMPEG_CRF}`, '-preset fast', `-vf ${vf}`, '-movflags +faststart'])
       .output(toFfmpegPath(outputPath))
       .on('stderr', (line) => stderrLines.push(line))
       .on('end', () => { clearTimeout(timer); resolve(outputPath); })
