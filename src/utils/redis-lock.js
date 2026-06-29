@@ -7,7 +7,12 @@ let client = null;
 function getClient() {
   if (!client) {
     if (!process.env.REDIS_URL) throw new Error('REDIS_URL não configurado');
-    client = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: null, lazyConnect: true });
+    const isTLS = process.env.REDIS_URL.startsWith('rediss://');
+    client = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      lazyConnect: true,
+      ...(isTLS ? { tls: { rejectUnauthorized: false } } : {}),
+    });
   }
   return client;
 }

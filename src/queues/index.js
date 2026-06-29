@@ -23,9 +23,11 @@ function getConnection() {
         'Dica: docker run -d -p 6379:6379 redis:alpine'
       );
     }
+    const isTLS = process.env.REDIS_URL.startsWith('rediss://');
     connection = {
       url: process.env.REDIS_URL,
       maxRetriesPerRequest: null, // obrigatório para BullMQ workers
+      ...(isTLS ? { tls: { rejectUnauthorized: false } } : {}),
     };
   }
   return connection;

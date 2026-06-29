@@ -27,11 +27,13 @@ async function checkDb() {
 async function checkRedis() {
   if (!process.env.REDIS_URL) return { status: 'not_configured', latency_ms: null };
   const start = Date.now();
+  const isTLS = process.env.REDIS_URL.startsWith('rediss://');
   const client = new Redis(process.env.REDIS_URL, {
     maxRetriesPerRequest: 0,
     connectTimeout: CHECK_TIMEOUT_MS,
     lazyConnect: true,
     enableOfflineQueue: false,
+    ...(isTLS ? { tls: { rejectUnauthorized: false } } : {}),
   });
   try {
     await withTimeout(client.connect(), CHECK_TIMEOUT_MS);
