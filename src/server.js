@@ -1,6 +1,11 @@
 'use strict';
 
-const _dotenvResult = require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
+let _dotenvResult = { error: null };
+try {
+  _dotenvResult = require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
+} catch (e) {
+  _dotenvResult = { error: e };
+}
 const logger = require('./utils/logger').child({ module: 'server' });
 
 logger.info(_dotenvResult.error
