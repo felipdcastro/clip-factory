@@ -1,5 +1,8 @@
 'use strict';
 
+// Render free tier nao suporta IPv6 outbound — forcar DNS IPv4
+require('dns').setDefaultResultOrder('ipv4first');
+
 let _dotenvResult = { error: null };
 try {
   _dotenvResult = require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
