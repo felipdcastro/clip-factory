@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: clip-factory
+    runtime: docker
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: TEMP_DIR
+        value: ./tmp
+      - key: FFMPEG_CRF
+        value: "18"
+      - key: CONTENT_TYPE
+        value: batalha-de-rima
+      - key: TRANSCRIPTION_LANGUAGE
+        value: pt
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ASSEMBLYAI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REDIRECT_URI
+        sync: false

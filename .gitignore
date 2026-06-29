@@ -7,3 +7,4 @@ tmp/
 *.log
 *.txt
 Imagens/
+railway-export.sql
