@@ -4,6 +4,8 @@ const logger = require('../utils/logger').child({ module: 'db' });
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // força IPv4 no Render (free tier não suporta IPv6 outbound)
+  family: 4,
 });
 
 pool.on('error', (err) => {
